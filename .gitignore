@@ -1,0 +1,8 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+data/bias_files
+data/future
+data/occurrence
+data/present
