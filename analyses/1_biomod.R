@@ -22,23 +22,25 @@ library(biomod2)
 # Arctic coords
 load("~/ArcticKelp/data/Arctic_BO.RData")
 ggplot(data = Arctic_BO, aes(x = lon, y = lat)) +
-  geom_raster(aes(fill = ))
+  geom_raster(aes(fill = BO_calcite))
 
 # NB: The data are housed on dropbox on Jesi Goldsmit's professional account
 # They have been downloaded locally to the dropbox folder on my machine
+# I then created a symbolic link from there to this project folder
+
+# The species occurrence data
+sps_files <- dir("data/occurrence", full.names = T)
 
 # Load a test species
-Aebu <- read_csv("~/modeling team! Dropbox/hotspot modelling/modelling_data/environmental/occurrence/Aebu_near.csv")
+sps <- read_csv(sps_files[1])
+ggplot(data = sps, aes(x = lon, y = lat)) +
+  borders() + geom_point(colour = "red") +
+  coord_quickmap(expand = F) + theme_void()
 
-# Load a few test variables
-expl <- raster::stack(
-  "~/modeling team! Dropbox/hotspot modelling/modelling_data/environmental/present/Bottom.Temp.Mean.asc",
-  "~/modeling team! Dropbox/hotspot modelling/modelling_data/environmental/present/SST.Mean.asc",
-  "~/modeling team! Dropbox/hotspot modelling/modelling_data/environmental/present/Bottom.Salinity.Mean.asc",
-  "~/modeling team! Dropbox/hotspot modelling/modelling_data/environmental/present/SSS.Mean.asc",
-  "~/modeling team! Dropbox/hotspot modelling/modelling_data/environmental/present/Ice.thick.Mean.asc"
-)
-plot(expl)
+# Load the present variables
+var_files <- dir("data/present", full.names = T)
+expl <- raster::stack(var_files)
+# plot(expl)
 
 
 # 3: Prep data ------------------------------------------------------------
@@ -46,16 +48,10 @@ plot(expl)
 # Create pseudoabsence points
   # NB: Need to verify these argument choices
 biomod_data <- BIOMOD_FormatingData(
-  resp.var = as.matrix(rep(1, nrow(Aebu))),
+  resp.var = rep(1, nrow(sps)),
   expl.var = expl,
-  resp.xy = as.matrix(Aebu[,2:3]),
-  resp.name = Aebu$sps[1],
-  PA.nb.rep = 1,
-  PA.nb.absences = 2100,
-  PA.strategy = 'sre',
-  PA.dist.min = 1,
-  PA.dist.max = NULL,
-  PA.sre.quant = 0.01)
+  resp.xy = as.matrix(sps[,2:3]),
+  resp.name = sps$sps[1])
 
 # check data format
 biomod_data
@@ -63,11 +59,17 @@ biomod_data
 # Check plot of data
 plot(biomod_data)
 
+# Cross validation
+BIOMOD_cv()
+
 
 # 4: Model ----------------------------------------------------------------
 
 # Model options
 biomod_option <- BIOMOD_ModelingOptions(GLM = list(type = 'polynomial', interaction.level = 1))
+
+# Need to lk into this
+BIOMOD_tuning()
 
 # Run the model
 model_out <- BIOMOD_Modeling( # No need to run a second time
@@ -92,10 +94,14 @@ variable_importances <- get_variables_importance(model_out)
 variable_importances
 
 # Get all models evaluation
+evaluate()
 model_eval <- get_evaluations(model_out)
 dimnames(model_eval)
 
 model_eval[,,,"Full",]
+
+# Visualise quality of different models
+biomod2::models_scores_graph()
 
 
 # 5. Present projections --------------------------------------------------
@@ -104,6 +110,12 @@ model_eval[,,,"Full",]
 # best: model_eval["ROC",,,"Full","PA1"]
 
 model_out@models.computed
+
+# For ensemble forecast from all models
+BIOMOD_EnsembleForecasting()
+
+# For presence only
+BIOMOD_presenceonly()
 
 # Create projections
 projection <- BIOMOD_Projection(
@@ -125,8 +137,12 @@ load("data/projection_Aebu.Rdata")
 plot(projection)
 
 # Get projections
+  # NB: There are many biomod2::get_ functions for looking at results more closely
 current_projection <- get_predictions(projection)
 current_projection
+
+# Look at particular aspects of projections
+biomod2::free()
 
 # current_GAM <- raster(current_projection, layer = "ECKMAX_PA1_Full_GAM") # doesn't work
 # current_MAXENT <- raster(current_projection, layer = "Aebu_PA1_Full_MAXENT.Phillips")
@@ -187,6 +203,9 @@ plot(projection_50)
 # Get projections
 current_projection_50 <- get_predictions(projection_50)
 current_projection_50
+
+# Somehow use this to compare the projections over time
+BIOMOD_RangeSize()
 
 # current_GAM <- raster(current_projection_50, layer = "ECKMAX_PA1_Full_GAM") # doesn't work
 # current_MAXENT <- raster(current_projection_50, layer = "ECKMAX_PA1_Full_MAXENT.Tsuruoka")
