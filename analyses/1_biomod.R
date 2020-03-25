@@ -15,14 +15,7 @@
 
 library(tidyverse)
 library(biomod2)
-
-
-# 2: Load data ------------------------------------------------------------
-
-# Arctic coords
-load("~/ArcticKelp/data/Arctic_BO.RData")
-ggplot(data = Arctic_BO, aes(x = lon, y = lat)) +
-  geom_raster(aes(fill = BO_calcite))
+library(FNN)
 
 # NB: The data are housed on dropbox on Jesi Goldsmit's professional account
 # They have been downloaded locally to the dropbox folder on my machine
@@ -31,27 +24,68 @@ ggplot(data = Arctic_BO, aes(x = lon, y = lat)) +
 # The species occurrence data
 sps_files <- dir("data/occurrence", full.names = T)
 
+# The environmental file pathways
+var_files <- dir("data/present", full.names = T)
+
+
+# 2: Load data ------------------------------------------------------------
+
+# Arctic coords from BioOracle
+load("~/ArcticKelp/data/Arctic_BO.RData")
+ggplot(data = Arctic_BO, aes(x = lon, y = lat)) +
+  geom_raster(aes(fill = BO2_templtmin_bdmax))
+
+# Global coords from Jesi's data
+global_coords <- as.data.frame(sp::read.asciigrid(var_files[1]), xy = T)
+global_coords$env_index <- 1:nrow(global_coords)
+
+# The best variables per species
+## Need to create this from supp table 3
+
 # Load a test species
-sps <- read_csv(sps_files[1])
+sps <- read_csv(sps_files[1]) %>% 
+  mutate(env_index = as.vector(knnx.index(as.matrix(global_coords[,c("s1", "s2")]),
+                                          as.matrix(.[,c("lon", "lat")]), k = 1))) %>%
+  left_join(global_coords, by = "env_index") %>% 
+  dplyr::select(sps, s1, s2) %>%
+  dplyr::rename(lon = s1, lat = s2)
+
+# Visualise
 ggplot(data = sps, aes(x = lon, y = lat)) +
   borders() + geom_point(colour = "red") +
   coord_quickmap(expand = F) + theme_void()
 
+# Split into training and testing
+train <- sample(1:nrow(sps), 0.7*nrow(sps), replace = FALSE)
+sps_train <- sps[train,]
+sps_test <- sps[-train,]
+
+# Wrapper function for loading an ASCII file as a data.frame
+load_asc_to_df <- function(file_name){
+  res <- as.data.frame(sp::read.asciigrid(file_name), xy = T)
+}
+
+
+
 # Load the present variables
-var_files <- dir("data/present", full.names = T)
+## Need to screen the files loaded based on the species being modelled
+expl <- load_asc_to_df(var_files[1]) %>% 
+  dplyr::rename(lon = s1, lat = s2)
+# expl <- map_dfc(var_files[1:2], load_asc_to_df)
 expl <- raster::stack(var_files)
 # plot(expl)
+
+test_join <- left_join(sps, expl)
 
 
 # 3: Prep data ------------------------------------------------------------
 
-# Create pseudoabsence points
-  # NB: Need to verify these argument choices
+# Prep data for modelling
 biomod_data <- BIOMOD_FormatingData(
-  resp.var = rep(1, nrow(sps)),
-  expl.var = expl,
-  resp.xy = as.matrix(sps[,2:3]),
-  resp.name = sps$sps[1])
+  resp.var = rep(1, nrow(sps_train)),
+  resp.xy = as.matrix(sps_train[,2:3]),
+  resp.name = sps$sps[1],
+  expl.var = expl)
 
 # check data format
 biomod_data
