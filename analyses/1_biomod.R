@@ -52,14 +52,14 @@ sps <- read_csv(sps_files[1]) %>%
   dplyr::select(sps, s1, s2) #%>%
   # dplyr::rename(lon = s1, lat = s2)
 
-# Convert it to a raster file
-sps_raster <- left_join(global_coords, sps, by = c("s1", "s2")) %>% 
-  dplyr::select(s1, s2, sps) %>% 
-  mutate(sps = as.numeric(as.factor(sps))) %>% 
-  raster::rasterFromXYZ()
+# Convert it to spatial points dataframe
+sps_spatial <- left_join(global_coords, sps, by = c("s1", "s2")) %>% 
+  dplyr::select(s1, s2, sps)
+coordinates(sps_spatial) <- ~ s1 + s2
+gridded(sps_spatial) <- TRUE
 
 # Visualise
-plot(sps_raster)
+# plot(sps_spatial)
 # ggplot(data = sps, aes(x = lon, y = lat)) +
 #   borders() + geom_point(colour = "red") +
 #   coord_quickmap(expand = F) + theme_void()
@@ -90,9 +90,9 @@ expl <- raster::stack("data/present/Bottom.Temp.max.asc",
 
 # Prep data for modelling
 biomod_data <- BIOMOD_FormatingData(
-  # resp.var = rep(1, nrow(sps)),
-  # resp.xy = as.matrix(sps[,2:3]),
-  resp.var = sps_raster,
+  resp.var = rep(1, nrow(sps)),
+  resp.xy = as.matrix(sps[,2:3]),
+  # resp.var = sps_spatial,
   resp.name = sps$sps[1],
   # eval.resp.var = rep(1, nrow(sps_test)), # Doesn't work with presence only...
   # eval.resp.xy = as.matrix(sps_test[,2:3]),
@@ -123,35 +123,35 @@ biomod_cv <- BIOMOD_cv(biomod_data)
 # Run the model
 biomod_model <- BIOMOD_Modeling(
   biomod_data,
-  # models = c('GLM', 'GBM','CTA','RF'),
-  # models.options = biomod_option,
-  # NbRunEval = 3,
+  models = c('GLM', 'GBM', 'GAM', 'CTA', 'ANN', 'SRE', 'FDA', 'RF'),
+  models.options = biomod_option,
+  NbRunEval = 3,
   DataSplit = 70,
   # Yweights = NULL,
-  VarImport = 3,
+  VarImport = 1,
   models.eval.meth = c('TSS','ROC', 'KAPPA', 'ACCURACY', 'BIAS'),
-  SaveObj = FALSE,
+  # SaveObj = FALSE,
   rescal.all.models = TRUE,
   do.full.models = F)
 # save(model_out, file = paste0("data/biomod_",sps$sps[1],".Rdata"))
 # load(paste0("data/biomod_",sps$sps[1],".Rdata"))
 
 # Have a look at the outputs
-model_out
+biomod_model
 
 # Relative importance of exploratory variables
-variable_importances <- get_variables_importance(model_out)
+variable_importances <- get_variables_importance(biomod_model)
 variable_importances
 
 # Get all models evaluation
-evaluate()
-model_eval <- get_evaluations(model_out)
-dimnames(model_eval)
+# evaluate()
+biomod_eval <- get_evaluations(biomod_model)
+dimnames(biomod_eval)
 
-model_eval[,,,"Full",]
+biomod_eval[,,,"RUN1","PA5"]
 
 # Visualise quality of different models
-biomod2::models_scores_graph()
+models_scores_graph(biomod_model)
 
 
 # 5. Present projections --------------------------------------------------
@@ -159,63 +159,62 @@ biomod2::models_scores_graph()
 # prints out whichever other variable you need (See dimensions to pick which evaluations) 
 # best: model_eval["ROC",,,"Full","PA1"]
 
-model_out@models.computed
+biomod_model@models.computed
 
 # For ensemble forecast from all models
-BIOMOD_EnsembleForecasting()
+# BIOMOD_EnsembleForecasting()
 
 # For presence only
-BIOMOD_presenceonly()
+# BIOMOD_presenceonly()
 
 # Create projections
-projection <- BIOMOD_Projection(
-  modeling.output = model_out,
+biomod_projection <- BIOMOD_Projection(
+  modeling.output = biomod_model,
   new.env = expl,
-  proj.name = 'GGM',
-  xy.new.env = as.matrix(Arctic_BO[,1:2]),
-  selected.models = model_out@models.computed[13:16],
+  proj.name = 'present',
+  # selected.models = biomod_model@models.computed,#[13:16],
+  binary.meth = 'TSS',
   Bin.trans = TRUE,
-  slot = model_out@models.computed,
-  binary.meth ='TSS',
-  compress = 'xz',
-  clamping.mask = F,
-  SaveObj = TRUE)
-save(projection, file = "data/projection_Aebu.Rdata")
-load("data/projection_Aebu.Rdata")
+  slot = biomod_model@models.computed,
+  compress = FALSE,
+  build.clamping.mask = FALSE)#,
+  # SaveObj = TRUE)
+# save(projection, file = "data/projection_Aebu.Rdata")
+# load("data/projection_Aebu.Rdata")
 
 # Plot projections
-plot(projection)
+plot(biomod_projection)
 
-# Get projections
+# Get predictions
   # NB: There are many biomod2::get_ functions for looking at results more closely
-current_projection <- get_predictions(projection)
-current_projection
+present_predictions <- get_predictions(biomod_projection)
+present_predictions
 
-# Look at particular aspects of projections
+# Look at particular aspects of predictions
 biomod2::free()
 
-# current_GAM <- raster(current_projection, layer = "ECKMAX_PA1_Full_GAM") # doesn't work
-# current_MAXENT <- raster(current_projection, layer = "Aebu_PA1_Full_MAXENT.Phillips")
-current_GLM <- raster(current_projection, layer = "Aebu_PA1_Full_GLM")
-current_GBM <- raster(current_projection, layer = "Aebu_PA1_Full_GBM")
-current_MARS <- raster(current_projection, layer = "Aebu_PA1_Full_MARS")
-current_CTA <- raster(current_projection, layer = "Aebu_PA1_Full_CTA")
-current_RF <- raster(current_projection, layer = "Aebu_PA1_Full_RF")
+# present_GAM <- raster(present_projection, layer = "ECKMAX_PA1_Full_GAM") # doesn't work
+# present_MAXENT <- raster(present_projection, layer = "Aebu_PA1_Full_MAXENT.Phillips")
+present_GLM <- raster(present_projection, layer = "Aebu_PA1_Full_GLM")
+present_GBM <- raster(present_projection, layer = "Aebu_PA1_Full_GBM")
+present_MARS <- raster(present_projection, layer = "Aebu_PA1_Full_MARS")
+present_CTA <- raster(present_projection, layer = "Aebu_PA1_Full_CTA")
+present_RF <- raster(present_projection, layer = "Aebu_PA1_Full_RF")
 
 # Save individual projections
-writeRaster(current_GLM, filename = 'data/ECKMAX/proj_GGM/GLM.asc',
+writeRaster(present_GLM, filename = 'data/ECKMAX/proj_GGM/GLM.asc',
             format = "ascii", overwrite = TRUE )
 
-writeRaster(current_GBM, filename = 'data/ECKMAX/proj_GGM/GBM.asc',
+writeRaster(present_GBM, filename = 'data/ECKMAX/proj_GGM/GBM.asc',
             format = "ascii", overwrite = TRUE )
 
-writeRaster(current_MARS, filename = 'data/ECKMAX/proj_GGM/MARS.asc',
+writeRaster(present_MARS, filename = 'data/ECKMAX/proj_GGM/MARS.asc',
             format = "ascii", overwrite = TRUE )
 
-writeRaster(current_CTA, filename = 'data/ECKMAX/proj_GGM/CTA.asc',
+writeRaster(present_CTA, filename = 'data/ECKMAX/proj_GGM/CTA.asc',
             format = "ascii", overwrite = TRUE )
 
-writeRaster(current_RF, filename = 'data/ECKMAX/proj_GGM/RF.asc',
+writeRaster(present_RF, filename = 'data/ECKMAX/proj_GGM/RF.asc',
             format = "ascii", overwrite = TRUE )
 
 
