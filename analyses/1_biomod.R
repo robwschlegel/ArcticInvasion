@@ -15,7 +15,9 @@
 
 library(tidyverse)
 library(biomod2)
+library(sp)
 library(FNN)
+library(doParallel); registerDoParallel(cores = 7)
 
 # NB: The data are housed on dropbox on Jesi Goldsmit's professional account
 # They have been downloaded locally to the dropbox folder on my machine
@@ -31,9 +33,9 @@ var_files <- dir("data/present", full.names = T)
 # 2: Load data ------------------------------------------------------------
 
 # Arctic coords from BioOracle
-load("~/ArcticKelp/data/Arctic_BO.RData")
-ggplot(data = Arctic_BO, aes(x = lon, y = lat)) +
-  geom_raster(aes(fill = BO2_templtmin_bdmax))
+# load("~/ArcticKelp/data/Arctic_BO.RData")
+# ggplot(data = Arctic_BO, aes(x = lon, y = lat)) +
+#   geom_raster(aes(fill = BO2_templtmin_bdmax))
 
 # Global coords from Jesi's data
 global_coords <- as.data.frame(sp::read.asciigrid(var_files[1]), xy = T)
@@ -47,45 +49,57 @@ sps <- read_csv(sps_files[1]) %>%
   mutate(env_index = as.vector(knnx.index(as.matrix(global_coords[,c("s1", "s2")]),
                                           as.matrix(.[,c("lon", "lat")]), k = 1))) %>%
   left_join(global_coords, by = "env_index") %>% 
-  dplyr::select(sps, s1, s2) %>%
-  dplyr::rename(lon = s1, lat = s2)
+  dplyr::select(sps, s1, s2) #%>%
+  # dplyr::rename(lon = s1, lat = s2)
+
+# Convert it to a raster file
+sps_raster <- left_join(global_coords, sps, by = c("s1", "s2")) %>% 
+  dplyr::select(s1, s2, sps) %>% 
+  mutate(sps = as.numeric(as.factor(sps))) %>% 
+  raster::rasterFromXYZ()
 
 # Visualise
-ggplot(data = sps, aes(x = lon, y = lat)) +
-  borders() + geom_point(colour = "red") +
-  coord_quickmap(expand = F) + theme_void()
+plot(sps_raster)
+# ggplot(data = sps, aes(x = lon, y = lat)) +
+#   borders() + geom_point(colour = "red") +
+#   coord_quickmap(expand = F) + theme_void()
 
 # Split into training and testing
-train <- sample(1:nrow(sps), 0.7*nrow(sps), replace = FALSE)
-sps_train <- sps[train,]
-sps_test <- sps[-train,]
+# train <- sample(1:nrow(sps), 0.7*nrow(sps), replace = FALSE)
+# sps_train <- sps[train,]
+# sps_test <- sps[-train,]
 
 # Wrapper function for loading an ASCII file as a data.frame
-load_asc_to_df <- function(file_name){
-  res <- as.data.frame(sp::read.asciigrid(file_name), xy = T)
-}
-
-
+# load_asc_to_df <- function(file_name){
+#   res <- as.data.frame(read.asciigrid(file_name), xy = T)
+# }
 
 # Load the present variables
 ## Need to screen the files loaded based on the species being modelled
-expl <- load_asc_to_df(var_files[1]) %>% 
-  dplyr::rename(lon = s1, lat = s2)
+# expl <- load_asc_to_df(var_files[1]) %>% 
+#   dplyr::rename(lon = s1, lat = s2)
 # expl <- map_dfc(var_files[1:2], load_asc_to_df)
-expl <- raster::stack(var_files)
+# expl <- raster::stack(var_files)
+expl <- raster::stack("data/present/Bottom.Temp.max.asc",
+                      "data/present/SST.min.asc",
+                      "data/present/landdist_clip.asc")
 # plot(expl)
-
-test_join <- left_join(sps, expl)
 
 
 # 3: Prep data ------------------------------------------------------------
 
 # Prep data for modelling
 biomod_data <- BIOMOD_FormatingData(
-  resp.var = rep(1, nrow(sps_train)),
-  resp.xy = as.matrix(sps_train[,2:3]),
+  # resp.var = rep(1, nrow(sps)),
+  # resp.xy = as.matrix(sps[,2:3]),
+  resp.var = sps_raster,
   resp.name = sps$sps[1],
-  expl.var = expl)
+  # eval.resp.var = rep(1, nrow(sps_test)), # Doesn't work with presence only...
+  # eval.resp.xy = as.matrix(sps_test[,2:3]),
+  expl.var = expl, 
+  PA.nb.rep = 5,
+  PA.strategy = "sre",
+  PA.sre.quant = 0.1)
 
 # check data format
 biomod_data
@@ -93,32 +107,34 @@ biomod_data
 # Check plot of data
 plot(biomod_data)
 
-# Cross validation
-BIOMOD_cv()
+# Model options
+biomod_option <- BIOMOD_ModelingOptions()
 
+# Cross validation
+biomod_cv <- BIOMOD_cv(biomod_data)
+
+# Need to look into this
+# biomod_tuning <- BIOMOD_tuning(biomod_data, # Doesn't run... 
+#                                env.ME = expl,
+#                                n.bg.ME = ncell(expl))
 
 # 4: Model ----------------------------------------------------------------
 
-# Model options
-biomod_option <- BIOMOD_ModelingOptions(GLM = list(type = 'polynomial', interaction.level = 1))
-
-# Need to lk into this
-BIOMOD_tuning()
-
 # Run the model
-model_out <- BIOMOD_Modeling( # No need to run a second time
+biomod_model <- BIOMOD_Modeling(
   biomod_data,
-  models = c('GLM', 'GBM','CTA','RF'),
-  models.options = biomod_option,
-  NbRunEval = 3,
+  # models = c('GLM', 'GBM','CTA','RF'),
+  # models.options = biomod_option,
+  # NbRunEval = 3,
   DataSplit = 70,
-  Yweights = NULL,
+  # Yweights = NULL,
   VarImport = 3,
-  models.eval.meth = c('TSS','ROC', 'KAPPA'),
-  SaveObj = TRUE,
-  rescal.all.models = TRUE)
-save(model_out, file = "data/model_out_Aebu.Rdata")
-load("data/model_out_Aebu.Rdata")
+  models.eval.meth = c('TSS','ROC', 'KAPPA', 'ACCURACY', 'BIAS'),
+  SaveObj = FALSE,
+  rescal.all.models = TRUE,
+  do.full.models = F)
+# save(model_out, file = paste0("data/biomod_",sps$sps[1],".Rdata"))
+# load(paste0("data/biomod_",sps$sps[1],".Rdata"))
 
 # Have a look at the outputs
 model_out
