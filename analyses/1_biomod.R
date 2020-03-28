@@ -13,11 +13,12 @@
 
 # 1: Libraries ------------------------------------------------------------
 
+.libPaths(c("~/R-packages", .libPaths()))
 library(tidyverse)
 library(biomod2)
 library(sp)
 library(FNN)
-library(doParallel); registerDoParallel(cores = 7)
+library(doParallel); registerDoParallel(cores = 50)
 
 # NB: The data are housed on dropbox on Jesi Goldsmit's professional account
 # They have been downloaded locally to the dropbox folder on my machine
@@ -28,6 +29,8 @@ sps_files <- dir("data/occurrence", full.names = T)
 
 # The environmental file pathways
 var_files <- dir("data/present", full.names = T)
+var_2050_files <- dir("data/future/2050", full.names = T)
+var_2100_files <- dir("data/future/2100", full.names = T)
 
 
 # 2: Load data ------------------------------------------------------------
@@ -123,7 +126,7 @@ biomod_cv <- BIOMOD_cv(biomod_data)
 # Run the model
 biomod_model <- BIOMOD_Modeling(
   biomod_data,
-  models = c('GLM', 'GBM', 'GAM', 'CTA', 'ANN', 'SRE', 'FDA', 'RF'),
+  models = c('GLM', 'GAM', 'ANN', 'SRE', 'RF'),
   models.options = biomod_option,
   NbRunEval = 3,
   DataSplit = 70,
