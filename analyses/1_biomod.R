@@ -53,6 +53,8 @@ top_var <- read_csv("metadata/top_var.csv") %>%
 # The full biomod pipeline in one function
 biomod_pipeline <- function(sps_choice){
   
+  print(paste0("Began run on ",sps_choice))
+  
   # 2: Load data ------------------------------------------------------------
   
   # Load the species
