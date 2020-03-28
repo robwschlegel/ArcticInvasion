@@ -200,7 +200,7 @@ biomod_pipeline <- function(sps_choice){
 
 # 7: Run the full pipeline ------------------------------------------------
 
-plyr::l_ply(sps_files, .parallel = T)
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = T)
 
 # Testing the loading of files saved automatically to disk
 # load("Aebu/models/1585165610/Aebu_PA1_RUN1_ANN")
