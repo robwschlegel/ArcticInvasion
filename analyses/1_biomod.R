@@ -50,8 +50,12 @@ top_var <- read_csv("metadata/top_var.csv") %>%
   dplyr::select(-name) %>% 
   na.omit()
 
+
 # The full biomod pipeline in one function
 biomod_pipeline <- function(sps_choice){
+  
+  print(paste0("Began run on ",sps_choice))
+  
   
   # 2: Load data ------------------------------------------------------------
   
@@ -73,6 +77,7 @@ biomod_pipeline <- function(sps_choice){
   expl_2050 <- raster::stack(var_2050_files[which(sapply(str_split(var_2050_files, "/"), "[[", 3) %in% top_var_sub$value)])
   expl_2100 <- raster::stack(var_2100_files[which(sapply(str_split(var_2100_files, "/"), "[[", 3) %in% top_var_sub$value)])
   
+  
   # 3: Prep data ------------------------------------------------------------
   
   # Prep data for modelling
@@ -86,18 +91,12 @@ biomod_pipeline <- function(sps_choice){
     PA.nb.rep = 5,
     PA.strategy = "sre",
     PA.sre.quant = 0.1)
-  
-  # check data format
-  # biomod_data
-  
-  # Check plot of data
-  # plot(biomod_data)
+  saveRDS(biomod_data, file = paste0(sps$sps[1],"/",sps$sps[1],".base.Rds"))
+  # biomod_data <- readRDS("Aebu/Aebu.base.Rds")
   
   # Model options
   biomod_option <- BIOMOD_ModelingOptions()
   
-  # Cross validation
-  # biomod_cv <- BIOMOD_cv(biomod_data)
   
   # 4: Model ----------------------------------------------------------------
   
@@ -108,58 +107,38 @@ biomod_pipeline <- function(sps_choice){
     models.options = biomod_option,
     NbRunEval = 3,
     DataSplit = 70,
-    VarImport = 1,
-    models.eval.meth = c('TSS','ROC', 'KAPPA', 'ACCURACY', 'BIAS'),
+    VarImport = 0,
+    models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'ACCURACY', 'BIAS'),
     rescal.all.models = TRUE,
-    do.full.models = T,
+    do.full.models = FALSE,
     modeling.id = sps$sps[1])
   
-  # Have a look at the outputs
-  # biomod_model
+  # Build the ensemble models
+  biomod_ensemble <- BIOMOD_EnsembleModeling(
+    modeling.output = biomod_model,
+    eval.metric = 'TSS',
+    eval.metric.quality.threshold = 0.7,
+    models.eval.meth = 'TSS'#,
+    # prob.ci = TRUE
+  )
   
-  # Relative importance of exploratory variables
-  # variable_importances <- get_variables_importance(biomod_model)
-  # variable_importances
-  
-  # Get all models evaluation
-  # evaluate()
-  # biomod_eval <- get_evaluations(biomod_model)
-  # dimnames(biomod_eval)
-  
-  # biomod_eval[,,,"RUN1","PA5"]
-  
-  # Visualise quality of different models
-  # models_scores_graph(biomod_model)
   
   # 5. Present projections --------------------------------------------------
-  
-  # biomod_model@models.computed
-  
-  # For ensemble forecast from all models
-  # BIOMOD_EnsembleForecasting()
   
   # Create projections
   biomod_projection <- BIOMOD_Projection(
     modeling.output = biomod_model,
     new.env = expl,
     proj.name = 'present',
-    # selected.models = biomod_model@models.computed,#[13:16],
     binary.meth = 'TSS',
-    Bin.trans = TRUE,
-    slot = biomod_model@models.computed,
     compress = FALSE,
     build.clamping.mask = FALSE)
   
-  # Plot projections
-  # plot(biomod_projection)
+  # Create ensemble projections
+  biomod_ensemble_projection <- BIOMOD_EnsembleForecasting(
+    EM.output = biomod_ensemble,
+    projection.output = biomod_projection)
   
-  # Get predictions
-  # NB: There are many biomod2::get_ functions for looking at results more closely
-  # present_predictions <- get_predictions(biomod_projection)
-  # present_predictions
-  
-  # Look at particular aspects of predictions
-  # biomod2::free()
   
   # 6: Future projections ---------------------------------------------------
   
@@ -168,44 +147,34 @@ biomod_pipeline <- function(sps_choice){
     modeling.output = biomod_model,
     new.env = expl_2050,
     proj.name = '2050',
-    # selected.models = biomod_model@models.computed,#[13:16],
     binary.meth = 'TSS',
-    Bin.trans = TRUE,
-    slot = biomod_model@models.computed,
     compress = FALSE,
     build.clamping.mask = FALSE)
-  
-  # Plot projections
-  # plot(biomod_projection_2050)
-  
-  # Get projections
-  # projection_2050 <- get_predictions(biomod_projection_2050)
-  # projection_2050
-  
-  # Somehow use this to compare the projections over time
-  # BIOMOD_RangeSize()
+
+  # Create 2050 ensemble projections
+  biomod_ensemble_projection_2050 <- BIOMOD_EnsembleForecasting(
+    EM.output = biomod_ensemble,
+    projection.output = biomod_projection_2050)
   
   # Run 2100 projections
   biomod_projection_2100 <- BIOMOD_Projection(
     modeling.output = biomod_model,
     new.env = expl_2100,
     proj.name = '2100',
-    # selected.models = biomod_model@models.computed,#[13:16],
     binary.meth = 'TSS',
-    Bin.trans = TRUE,
-    slot = biomod_model@models.computed,
     compress = FALSE,
     build.clamping.mask = FALSE)
+  
+  # Create 2100 ensemble projections
+  biomod_ensemble_projection_2100 <- BIOMOD_EnsembleForecasting(
+    EM.output = biomod_ensemble,
+    projection.output = biomod_projection_2100)
 }
+
 
 # 7: Run the full pipeline ------------------------------------------------
 
-plyr::l_ply(sps_files, biomod_pipeline, .parallel = T)
+# NB: Focus on zooplankton group first
 
-# Testing the loading of files saved automatically to disk
-# load("Aebu/models/1585165610/Aebu_PA1_RUN1_ANN")
-# get_formal_model(Aebu_PA1_RUN1_ANN) 
-# summary(get_formal_model(Aebu_PA1_RUN1_ANN))
-# load("Aebu/Aebu.1585165851.models.out")
-# test_model <- BIOMOD_LoadModels(Aebu.1585165851.models.out, models = 'RF')
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = F)
 
