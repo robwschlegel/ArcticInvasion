@@ -21,10 +21,6 @@ library(sp)
 library(FNN)
 library(doParallel); registerDoParallel(cores = 50)
 
-# NB: The data are housed on dropbox on Jesi Goldsmit's professional account
-# They have been downloaded locally to the dropbox folder on my machine
-# I then created a symbolic link from there to this project folder
-
 # The species occurrence data
 sps_files <- dir("data/occurrence", full.names = T)
 
@@ -88,7 +84,7 @@ biomod_pipeline <- function(sps_choice){
     # eval.resp.var = rep(1, nrow(sps_test)), # Doesn't work with presence only...
     # eval.resp.xy = as.matrix(sps_test[,2:3]),
     expl.var = expl, 
-    PA.nb.rep = 5,
+    PA.nb.rep = 1,#5,
     PA.strategy = "sre",
     PA.sre.quant = 0.1)
   saveRDS(biomod_data, file = paste0(sps$sps[1],"/",sps$sps[1],".base.Rds"))
@@ -103,9 +99,9 @@ biomod_pipeline <- function(sps_choice){
   # Run the model
   biomod_model <- BIOMOD_Modeling(
     biomod_data,
-    models = c('GLM', 'GAM', 'ANN', 'SRE', 'RF'),
+    models = c('GLM', 'ANN', 'SRE', 'RF'),#'GAM', ,
     models.options = biomod_option,
-    NbRunEval = 3,
+    NbRunEval = 1,#3,
     DataSplit = 70,
     VarImport = 0,
     models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'ACCURACY', 'BIAS'),
@@ -176,5 +172,4 @@ biomod_pipeline <- function(sps_choice){
 
 # NB: Focus on zooplankton group first
 
-plyr::l_ply(sps_files, biomod_pipeline, .parallel = F)
-
+biomod_pipeline(sps_files[1])
