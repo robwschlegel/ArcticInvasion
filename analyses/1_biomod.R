@@ -53,7 +53,7 @@ loadRData <- function(fileName){
 }
 
 # Choose a species
-sps_choice <- sps_files[4]
+sps_choice <- sps_files[18]
 print(paste0("Began run on ",sps_choice))
 
 # NB: Focus on zooplankton group first
