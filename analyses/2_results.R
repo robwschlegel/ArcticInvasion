@@ -12,8 +12,28 @@
 
 # 1: Setup ----------------------------------------------------------------
 
+.libPaths(c("~/R-packages", .libPaths()))
+library(tidyverse)
+library(biomod2)
+library(sp)
+# library(FNN)
+library(doParallel); registerDoParallel(cores = 50)
+
 
 # 2: load biomod ----------------------------------------------------------
+
+# Function for re-loading .RData files as necessary
+#loads an RData file, and returns it
+loadRData <- function(fileName){
+  load(fileName)
+  get(ls()[ls() != "fileName"])
+}
+
+biomod_ensemble_projection <- loadRData("Aebu/proj_present/Aebu.present.ensemble.projection.out")
+plot(biomod_ensemble_projection)
+
+test_raster <- raster("Aebu/proj_present/proj_present_Aebu_TSSbin.gri")
+plot(test_raster)
 
 
 # 3: Results --------------------------------------------------------------
