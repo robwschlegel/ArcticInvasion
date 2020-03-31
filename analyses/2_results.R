@@ -78,6 +78,18 @@ writeRaster(test_raster, "Aebu/proj_present/proj_present_Aebu_TSSbin.asc")
 
 # 4: Visuals --------------------------------------------------------------
 
+# Convert raster to data frame
+test_df <- as.data.frame(test_raster, xy = TRUE) %>% 
+  mutate(x = plyr::round_any(x, 0.25), 
+         y = plyr::round_any(y, 0.25)) %>% 
+  group_by(x, y) %>% 
+  summarise(mean_layer = round(mean(layer.1, na.rm = TRUE))) %>% 
+  ungroup() %>% 
+  na.omit()
+
+ggplot(data = test_df, aes(x = x, y = y)) +
+  geom_tile(aes(fill = as.factor(mean_layer)))
+
 
 # 5: Process --------------------------------------------------------------
 
