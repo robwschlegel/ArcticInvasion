@@ -54,8 +54,7 @@ loadRData <- function(fileName){
 
 # Choose a species
 sps_choice <- sps_files[4]
-sps_name <- sps_name
-print(paste0("Began run on ",sps_name))
+print(paste0("Began run on ",sps_choice))
 
 # NB: Focus on zooplankton group first
 # c(2, 4, 18)
@@ -70,6 +69,16 @@ sps <- read_csv(sps_choice) %>%
   left_join(global_coords, by = "env_index") %>% 
   dplyr::select(Sps, s1, s2) %>%
   dplyr::rename(lon = s1, lat = s2)
+
+# The species abbreviation
+sps_name <- sps$Sps[1]
+
+# Determine number of pseudo-absences to use
+if(nrow(sps) <= 1000){
+  PA_absence_count <- 1000
+} else{
+  PA_absence_count <- 10000
+}
 
 # Filter out the top variables
 top_var_sub <- top_var %>% 
@@ -97,6 +106,7 @@ biomod_data <- BIOMOD_FormatingData(
   resp.name = sps_name,
   expl.var = expl, 
   PA.nb.rep = 5,
+  PA.nb.absences = PA_absence_count,
   PA.strategy = "sre",
   PA.sre.quant = 0.1)
 # biomod_data <- readRDS(paste0(sps_name,"/",sps_name,".base.Rds"))
@@ -154,6 +164,10 @@ biomod_ensemble_projection <- BIOMOD_EnsembleForecasting(
 # Clean out some space
 rm(biomod_projection, biomod_ensemble_projection); gc()
 
+# Flush local tmp drive. Better not to do this if running on mulitple cores
+# unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
+# dir(tempdir())
+
 
 # 6: Future projections ---------------------------------------------------
 
@@ -174,6 +188,9 @@ biomod_ensemble_projection_2050 <- BIOMOD_EnsembleForecasting(
 # Clean out 2050
 rm(biomod_projection_2050, biomod_ensemble_projection_2050); gc()
 
+# Flush local tmp drive. Better not to do this if running on mulitple cores
+# unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
+
 # Run 2100 projections
 biomod_projection_2100 <- BIOMOD_Projection(
   modeling.output = biomod_model,
@@ -189,7 +206,10 @@ biomod_ensemble_projection_2100 <- BIOMOD_EnsembleForecasting(
   projection.output = biomod_projection_2100)
 
 # Clean out 2100
-rm(biomod_projection, biomod_ensemble_projection); gc()
+rm(biomod_projection_2100, biomod_ensemble_projection_2100); gc()
+
+# Flush local tmp drive. Better not to do this if running on mulitple cores
+# unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
 
 # Unlink Temp folder
 unlink(paste0(sps_name,"/Temp"), recursive = TRUE)
