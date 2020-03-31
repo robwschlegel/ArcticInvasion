@@ -35,6 +35,8 @@ plot(biomod_ensemble_projection)
 test_raster <- raster("Aebu/proj_present/proj_present_Aebu_TSSbin.gri")
 plot(test_raster)
 
+writeRaster(test_raster, "Aebu/proj_present/proj_present_Aebu_TSSbin.asc")
+
 
 # 3: Results --------------------------------------------------------------
 
