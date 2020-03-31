@@ -70,15 +70,31 @@ sps <- read_csv(sps_choice) %>%
   dplyr::select(Sps, s1, s2) %>%
   dplyr::rename(lon = s1, lat = s2)
 
+# The species abbreviation
+sps_name <- sps$Sps[1]
+
+# Determine number of pseudo-absences to use
+if(nrow(sps) <= 1000){
+  PA_absence_count <- 1000
+} else{
+  PA_absence_count <- 10000
+}
+
 # Filter out the top variables
 top_var_sub <- top_var %>% 
-  filter(str_remove(Code, pattern = "_near") == sps$Sps[1]) %>% 
+  filter(str_remove(Code, pattern = "_near") == sps_name) %>% 
   mutate(value = paste0(value,".asc"))
 
 # Load the top variables for the species
 expl <- raster::stack(var_files[which(sapply(str_split(var_files, "/"), "[[", 3) %in% top_var_sub$value)])
 expl_2050 <- raster::stack(var_2050_files[which(sapply(str_split(var_2050_files, "/"), "[[", 3) %in% top_var_sub$value)])
 expl_2100 <- raster::stack(var_2100_files[which(sapply(str_split(var_2100_files, "/"), "[[", 3) %in% top_var_sub$value)])
+
+# Set temp folder save locations
+# http://www.r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
+dir.create (file.path(sps_name), showWarnings = FALSE)
+dir.create (file.path(sps_name,"/Temp"), showWarnings = FALSE)
+rasterOptions(tmpdir = paste0(sps_name,"/Temp"))
 
 
 # 3: Prep data ------------------------------------------------------------
@@ -87,14 +103,13 @@ expl_2100 <- raster::stack(var_2100_files[which(sapply(str_split(var_2100_files,
 biomod_data <- BIOMOD_FormatingData(
   resp.var = rep(1, nrow(sps)),
   resp.xy = as.matrix(sps[,2:3]),
-  resp.name = sps$Sps[1],
-  # eval.resp.var = rep(1, nrow(sps_test)), # Doesn't work with presence only...
-  # eval.resp.xy = as.matrix(sps_test[,2:3]),
+  resp.name = sps_name,
   expl.var = expl, 
   PA.nb.rep = 5,
+  PA.nb.absences = PA_absence_count,
   PA.strategy = "sre",
   PA.sre.quant = 0.1)
-# biomod_data <- readRDS(paste0(sps$Sps[1],"/",sps$Sps[1],".base.Rds"))
+# biomod_data <- readRDS(paste0(sps_name,"/",sps_name,".base.Rds"))
 
 # Model options
 biomod_option <- BIOMOD_ModelingOptions()
@@ -105,7 +120,7 @@ biomod_option <- BIOMOD_ModelingOptions()
 # Run the model
 biomod_model <- BIOMOD_Modeling(
   biomod_data,
-  models = c('GLM', 'ANN', 'SRE', 'RF'),#'GAM', ,
+  models = c('GLM', 'ANN', 'SRE', 'RF'),
   models.options = biomod_option,
   NbRunEval = 3,
   DataSplit = 70,
@@ -113,8 +128,8 @@ biomod_model <- BIOMOD_Modeling(
   models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'ACCURACY', 'BIAS'),
   rescal.all.models = TRUE,
   do.full.models = FALSE,
-  modeling.id = sps$Sps[1])
-biomod_model <- loadRData(paste0(sps$Sps[1],"/",sps$Sps[1],".",sps$Sps[1],".models.out"))
+  modeling.id = sps_name)
+# biomod_model <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,".models.out"))
 
 # Build the ensemble models
 biomod_ensemble <- BIOMOD_EnsembleModeling(
@@ -124,10 +139,10 @@ biomod_ensemble <- BIOMOD_EnsembleModeling(
   models.eval.meth = 'TSS'#,
   # prob.ci = TRUE
 )
-# biomod_ensemble <- loadRData(paste0(sps$Sps[1],"/",sps$Sps[1],".",sps$Sps[1],"ensemble.models.out"))
+# biomod_ensemble <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,"ensemble.models.out"))
 
 # Save the pre-model data for possible later use
-saveRDS(biomod_data, file = paste0(sps$Sps[1],"/",sps$Sps[1],".base.Rds"))
+saveRDS(biomod_data, file = paste0(sps_name,"/",sps_name,".base.Rds"))
 
 
 # 5. Present projections --------------------------------------------------
@@ -149,6 +164,10 @@ biomod_ensemble_projection <- BIOMOD_EnsembleForecasting(
 # Clean out some space
 rm(biomod_projection, biomod_ensemble_projection); gc()
 
+# Flush local tmp drive. Better not to do this if running on mulitple cores
+# unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
+# dir(tempdir())
+
 
 # 6: Future projections ---------------------------------------------------
 
@@ -169,6 +188,9 @@ biomod_ensemble_projection_2050 <- BIOMOD_EnsembleForecasting(
 # Clean out 2050
 rm(biomod_projection_2050, biomod_ensemble_projection_2050); gc()
 
+# Flush local tmp drive. Better not to do this if running on mulitple cores
+# unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
+
 # Run 2100 projections
 biomod_projection_2100 <- BIOMOD_Projection(
   modeling.output = biomod_model,
@@ -184,5 +206,11 @@ biomod_ensemble_projection_2100 <- BIOMOD_EnsembleForecasting(
   projection.output = biomod_projection_2100)
 
 # Clean out 2100
-rm(biomod_projection, biomod_ensemble_projection); gc()
+rm(biomod_projection_2100, biomod_ensemble_projection_2100); gc()
+
+# Flush local tmp drive. Better not to do this if running on mulitple cores
+# unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
+
+# Unlink Temp folder
+unlink(paste0(sps_name,"/Temp"), recursive = TRUE)
 
