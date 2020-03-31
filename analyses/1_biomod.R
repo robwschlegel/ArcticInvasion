@@ -3,13 +3,12 @@
 # on the many potential alien invasive species in the Arctic.
 # The data have already been prepared by Jesi for use in her Maxent model.
 # The order of operations is:
-# 1: Setup the environment for biomod_pipeline()
+# 1: Setup the environment
 # 2: Load data
 # 3: Prep data for modelling
 # 4: Run model ensemble
 # 5: Present projections
 # 6: Future projections
-# 7: Run the full pipeline
 
 
 # 1: Setup ----------------------------------------------------------------
@@ -46,133 +45,139 @@ top_var <- read_csv("metadata/top_var.csv") %>%
   dplyr::select(-name) %>% 
   na.omit()
 
+# Choose a species
+sps_choice <- sps_files[1]
+print(paste0("Began run on ",sps_choice))
 
-# The full biomod pipeline in one function
-biomod_pipeline <- function(sps_choice){
-  
-  print(paste0("Began run on ",sps_choice))
-  
-  
-  # 2: Load data ------------------------------------------------------------
-  
-  # Load the species
-  sps <- read_csv(sps_choice) %>% 
-    mutate(env_index = as.vector(knnx.index(as.matrix(global_coords[,c("s1", "s2")]),
-                                            as.matrix(.[,c("lon", "lat")]), k = 1))) %>%
-    left_join(global_coords, by = "env_index") %>% 
-    dplyr::select(sps, s1, s2) %>%
-    dplyr::rename(lon = s1, lat = s2)
-  
-  # Filter out the top variables
-  top_var_sub <- top_var %>% 
-    filter(str_remove(Code, pattern = "_near") == sps$sps[1]) %>% 
-    mutate(value = paste0(value,".asc"))
-  
-  # Load the top variables for the species
-  expl <- raster::stack(var_files[which(sapply(str_split(var_files, "/"), "[[", 3) %in% top_var_sub$value)])
-  expl_2050 <- raster::stack(var_2050_files[which(sapply(str_split(var_2050_files, "/"), "[[", 3) %in% top_var_sub$value)])
-  expl_2100 <- raster::stack(var_2100_files[which(sapply(str_split(var_2100_files, "/"), "[[", 3) %in% top_var_sub$value)])
-  
-  
-  # 3: Prep data ------------------------------------------------------------
-  
-  # Prep data for modelling
-  biomod_data <- BIOMOD_FormatingData(
-    resp.var = rep(1, nrow(sps)),
-    resp.xy = as.matrix(sps[,2:3]),
-    resp.name = sps$sps[1],
-    # eval.resp.var = rep(1, nrow(sps_test)), # Doesn't work with presence only...
-    # eval.resp.xy = as.matrix(sps_test[,2:3]),
-    expl.var = expl, 
-    PA.nb.rep = 5,
-    PA.strategy = "sre",
-    PA.sre.quant = 0.1)
-  saveRDS(biomod_data, file = paste0(sps$sps[1],"/",sps$sps[1],".base.Rds"))
-  # biomod_data <- readRDS("Aebu/Aebu.base.Rds")
-  
-  # Model options
-  biomod_option <- BIOMOD_ModelingOptions()
-  
-  
-  # 4: Model ----------------------------------------------------------------
-  
-  # Run the model
-  biomod_model <- BIOMOD_Modeling(
-    biomod_data,
-    models = c('GLM', 'ANN', 'SRE', 'RF'),#'GAM', ,
-    models.options = biomod_option,
-    NbRunEval = 3,
-    DataSplit = 70,
-    VarImport = 0,
-    models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'ACCURACY', 'BIAS'),
-    rescal.all.models = TRUE,
-    do.full.models = FALSE,
-    modeling.id = sps$sps[1])
-  
-  # Build the ensemble models
-  biomod_ensemble <- BIOMOD_EnsembleModeling(
-    modeling.output = biomod_model,
-    eval.metric = 'TSS',
-    eval.metric.quality.threshold = 0.7,
-    models.eval.meth = 'TSS'#,
-    # prob.ci = TRUE
-  )
-  
-  
-  # 5. Present projections --------------------------------------------------
-  
-  # Create projections
-  biomod_projection <- BIOMOD_Projection(
-    modeling.output = biomod_model,
-    new.env = expl,
-    proj.name = 'present',
-    binary.meth = 'TSS',
-    compress = FALSE,
-    build.clamping.mask = FALSE)
-  
-  # Create ensemble projections
-  biomod_ensemble_projection <- BIOMOD_EnsembleForecasting(
-    EM.output = biomod_ensemble,
-    projection.output = biomod_projection)
-  
-  
-  # 6: Future projections ---------------------------------------------------
-  
-  # Run 2050 projections
-  biomod_projection_2050 <- BIOMOD_Projection(
-    modeling.output = biomod_model,
-    new.env = expl_2050,
-    proj.name = '2050',
-    binary.meth = 'TSS',
-    compress = FALSE,
-    build.clamping.mask = FALSE)
-
-  # Create 2050 ensemble projections
-  biomod_ensemble_projection_2050 <- BIOMOD_EnsembleForecasting(
-    EM.output = biomod_ensemble,
-    projection.output = biomod_projection_2050)
-  
-  # Run 2100 projections
-  biomod_projection_2100 <- BIOMOD_Projection(
-    modeling.output = biomod_model,
-    new.env = expl_2100,
-    proj.name = '2100',
-    binary.meth = 'TSS',
-    compress = FALSE,
-    build.clamping.mask = FALSE)
-  
-  # Create 2100 ensemble projections
-  biomod_ensemble_projection_2100 <- BIOMOD_EnsembleForecasting(
-    EM.output = biomod_ensemble,
-    projection.output = biomod_projection_2100)
-}
-
-
-# 7: Run the full pipeline ------------------------------------------------
-
-# NB: This doesn't like to run with plyr function calls
 # NB: Focus on zooplankton group first
-for(i in c(4, 2, 18)){
-  biomod_pipeline(sps_files[i])
-  Sys.sleep(30) # Pause for 30 seconds
-}
+# c(2, 4, 18)
+  
+
+# 2: Load data ------------------------------------------------------------
+
+# Load the species
+sps <- read_csv(sps_choice) %>% 
+  mutate(env_index = as.vector(knnx.index(as.matrix(global_coords[,c("s1", "s2")]),
+                                          as.matrix(.[,c("lon", "lat")]), k = 1))) %>%
+  left_join(global_coords, by = "env_index") %>% 
+  dplyr::select(sps, s1, s2) %>%
+  dplyr::rename(lon = s1, lat = s2)
+
+# Filter out the top variables
+top_var_sub <- top_var %>% 
+  filter(str_remove(Code, pattern = "_near") == sps$sps[1]) %>% 
+  mutate(value = paste0(value,".asc"))
+
+# Load the top variables for the species
+expl <- raster::stack(var_files[which(sapply(str_split(var_files, "/"), "[[", 3) %in% top_var_sub$value)])
+expl_2050 <- raster::stack(var_2050_files[which(sapply(str_split(var_2050_files, "/"), "[[", 3) %in% top_var_sub$value)])
+expl_2100 <- raster::stack(var_2100_files[which(sapply(str_split(var_2100_files, "/"), "[[", 3) %in% top_var_sub$value)])
+
+
+# 3: Prep data ------------------------------------------------------------
+
+# Prep data for modelling
+biomod_data <- BIOMOD_FormatingData(
+  resp.var = rep(1, nrow(sps)),
+  resp.xy = as.matrix(sps[,2:3]),
+  resp.name = sps$sps[1],
+  # eval.resp.var = rep(1, nrow(sps_test)), # Doesn't work with presence only...
+  # eval.resp.xy = as.matrix(sps_test[,2:3]),
+  expl.var = expl, 
+  PA.nb.rep = 5,
+  PA.strategy = "sre",
+  PA.sre.quant = 0.1)
+saveRDS(biomod_data, file = paste0(sps$sps[1],"/",sps$sps[1],".base.Rds"))
+# biomod_data <- readRDS("Aebu/Aebu.base.Rds")
+
+# Model options
+biomod_option <- BIOMOD_ModelingOptions()
+
+
+# 4: Model ----------------------------------------------------------------
+
+# Run the model
+biomod_model <- BIOMOD_Modeling(
+  biomod_data,
+  models = c('GLM', 'ANN', 'SRE', 'RF'),#'GAM', ,
+  models.options = biomod_option,
+  NbRunEval = 3,
+  DataSplit = 70,
+  VarImport = 0,
+  models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'ACCURACY', 'BIAS'),
+  rescal.all.models = TRUE,
+  do.full.models = FALSE,
+  modeling.id = sps$sps[1])
+# load("Aebu/Aebu.Aebu.models.out")
+# biomod_model <- Aebu.Aebu.models.out
+# rm(Aebu.Aebu.models.out); gc()
+
+# Build the ensemble models
+biomod_ensemble <- BIOMOD_EnsembleModeling(
+  modeling.output = biomod_model,
+  eval.metric = 'TSS',
+  eval.metric.quality.threshold = 0.7,
+  models.eval.meth = 'TSS'#,
+  # prob.ci = TRUE
+)
+# load("Aebu/Aebu.Aebuensemble.models.out")
+# biomod_ensemble <- Aebu.Aebuensemble.models.out
+# rm(Aebu.Aebuensemble.models.out); gc()
+
+
+# 5. Present projections --------------------------------------------------
+
+# Create projections
+biomod_projection <- BIOMOD_Projection(
+  modeling.output = biomod_model,
+  new.env = expl,
+  proj.name = 'present',
+  binary.meth = 'TSS',
+  compress = FALSE,
+  build.clamping.mask = FALSE)
+
+# Create ensemble projections
+biomod_ensemble_projection <- BIOMOD_EnsembleForecasting(
+  EM.output = biomod_ensemble,
+  projection.output = biomod_projection)
+
+# Clean out some space
+rm(biomod_projection, biomod_ensemble_projection); gc()
+
+
+# 6: Future projections ---------------------------------------------------
+
+# Run 2050 projections
+biomod_projection_2050 <- BIOMOD_Projection(
+  modeling.output = biomod_model,
+  new.env = expl_2050,
+  proj.name = '2050',
+  binary.meth = 'TSS',
+  compress = FALSE,
+  build.clamping.mask = FALSE)
+
+# Create 2050 ensemble projections
+biomod_ensemble_projection_2050 <- BIOMOD_EnsembleForecasting(
+  EM.output = biomod_ensemble,
+  projection.output = biomod_projection_2050)
+
+# Clean out 2050
+rm(biomod_projection_2050, biomod_ensemble_projection_2050); gc()
+
+# Run 2100 projections
+biomod_projection_2100 <- BIOMOD_Projection(
+  modeling.output = biomod_model,
+  new.env = expl_2100,
+  proj.name = '2100',
+  binary.meth = 'TSS',
+  compress = FALSE,
+  build.clamping.mask = FALSE)
+
+# Create 2100 ensemble projections
+biomod_ensemble_projection_2100 <- BIOMOD_EnsembleForecasting(
+  EM.output = biomod_ensemble,
+  projection.output = biomod_projection_2100)
+
+# Clean out 2100
+rm(biomod_projection, biomod_ensemble_projection); gc()
+
