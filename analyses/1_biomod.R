@@ -46,7 +46,7 @@ top_var <- read_csv("metadata/top_var.csv") %>%
   na.omit()
 
 # Choose a species
-sps_choice <- sps_files[1]
+sps_choice <- sps_files[2]
 print(paste0("Began run on ",sps_choice))
 
 # NB: Focus on zooplankton group first
@@ -60,12 +60,12 @@ sps <- read_csv(sps_choice) %>%
   mutate(env_index = as.vector(knnx.index(as.matrix(global_coords[,c("s1", "s2")]),
                                           as.matrix(.[,c("lon", "lat")]), k = 1))) %>%
   left_join(global_coords, by = "env_index") %>% 
-  dplyr::select(sps, s1, s2) %>%
+  dplyr::select(Sps, s1, s2) %>%
   dplyr::rename(lon = s1, lat = s2)
 
 # Filter out the top variables
 top_var_sub <- top_var %>% 
-  filter(str_remove(Code, pattern = "_near") == sps$sps[1]) %>% 
+  filter(str_remove(Code, pattern = "_near") == sps$Sps[1]) %>% 
   mutate(value = paste0(value,".asc"))
 
 # Load the top variables for the species
@@ -80,14 +80,13 @@ expl_2100 <- raster::stack(var_2100_files[which(sapply(str_split(var_2100_files,
 biomod_data <- BIOMOD_FormatingData(
   resp.var = rep(1, nrow(sps)),
   resp.xy = as.matrix(sps[,2:3]),
-  resp.name = sps$sps[1],
+  resp.name = sps$Sps[1],
   # eval.resp.var = rep(1, nrow(sps_test)), # Doesn't work with presence only...
   # eval.resp.xy = as.matrix(sps_test[,2:3]),
   expl.var = expl, 
   PA.nb.rep = 5,
   PA.strategy = "sre",
   PA.sre.quant = 0.1)
-saveRDS(biomod_data, file = paste0(sps$sps[1],"/",sps$sps[1],".base.Rds"))
 # biomod_data <- readRDS("Aebu/Aebu.base.Rds")
 
 # Model options
@@ -107,10 +106,10 @@ biomod_model <- BIOMOD_Modeling(
   models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'ACCURACY', 'BIAS'),
   rescal.all.models = TRUE,
   do.full.models = FALSE,
-  modeling.id = sps$sps[1])
-# load("Aebu/Aebu.Aebu.models.out")
+  modeling.id = sps$Sps[1])
+# load(paste0(sps$Sps[1],"/",sps$Sps[1],".",sps$Sps[1],".models.out"))
 # biomod_model <- Aebu.Aebu.models.out
-# rm(Aebu.Aebu.models.out); gc()
+rm(Aebu.Aebu.models.out); gc()
 
 # Build the ensemble models
 biomod_ensemble <- BIOMOD_EnsembleModeling(
@@ -124,6 +123,9 @@ biomod_ensemble <- BIOMOD_EnsembleModeling(
 # biomod_ensemble <- Aebu.Aebuensemble.models.out
 # rm(Aebu.Aebuensemble.models.out); gc()
 
+# Save the pre-model data for possible later use
+saveRDS(biomod_data, file = paste0(sps$Sps[1],"/",sps$Sps[1],".base.Rds"))
+
 
 # 5. Present projections --------------------------------------------------
 
@@ -133,7 +135,7 @@ biomod_projection <- BIOMOD_Projection(
   new.env = expl,
   proj.name = 'present',
   binary.meth = 'TSS',
-  compress = FALSE,
+  compress = "xz",
   build.clamping.mask = FALSE)
 
 # Create ensemble projections
