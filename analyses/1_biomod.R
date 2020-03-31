@@ -45,6 +45,13 @@ top_var <- read_csv("metadata/top_var.csv") %>%
   dplyr::select(-name) %>% 
   na.omit()
 
+# Function for re-loading .RData files as necessary
+  #loads an RData file, and returns it
+loadRData <- function(fileName){
+  load(fileName)
+  get(ls()[ls() != "fileName"])
+}
+
 # Choose a species
 sps_choice <- sps_files[2]
 print(paste0("Began run on ",sps_choice))
@@ -87,7 +94,7 @@ biomod_data <- BIOMOD_FormatingData(
   PA.nb.rep = 5,
   PA.strategy = "sre",
   PA.sre.quant = 0.1)
-# biomod_data <- readRDS("Aebu/Aebu.base.Rds")
+# biomod_data <- readRDS(paste0(sps$Sps[1],"/",sps$Sps[1],".base.Rds"))
 
 # Model options
 biomod_option <- BIOMOD_ModelingOptions()
@@ -108,8 +115,8 @@ biomod_model <- BIOMOD_Modeling(
   do.full.models = FALSE,
   modeling.id = sps$Sps[1])
 # load(paste0(sps$Sps[1],"/",sps$Sps[1],".",sps$Sps[1],".models.out"))
-# biomod_model <- Aebu.Aebu.models.out
-rm(Aebu.Aebu.models.out); gc()
+biomod_model <- loadRData()
+# rm(Aebu.Aebu.models.out); gc()
 
 # Build the ensemble models
 biomod_ensemble <- BIOMOD_EnsembleModeling(
