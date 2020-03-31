@@ -114,9 +114,7 @@ biomod_model <- BIOMOD_Modeling(
   rescal.all.models = TRUE,
   do.full.models = FALSE,
   modeling.id = sps$Sps[1])
-# load(paste0(sps$Sps[1],"/",sps$Sps[1],".",sps$Sps[1],".models.out"))
-biomod_model <- loadRData()
-# rm(Aebu.Aebu.models.out); gc()
+biomod_model <- loadRData(paste0(sps$Sps[1],"/",sps$Sps[1],".",sps$Sps[1],".models.out"))
 
 # Build the ensemble models
 biomod_ensemble <- BIOMOD_EnsembleModeling(
@@ -126,9 +124,7 @@ biomod_ensemble <- BIOMOD_EnsembleModeling(
   models.eval.meth = 'TSS'#,
   # prob.ci = TRUE
 )
-# load("Aebu/Aebu.Aebuensemble.models.out")
-# biomod_ensemble <- Aebu.Aebuensemble.models.out
-# rm(Aebu.Aebuensemble.models.out); gc()
+# biomod_ensemble <- loadRData(paste0(sps$Sps[1],"/",sps$Sps[1],".",sps$Sps[1],"ensemble.models.out"))
 
 # Save the pre-model data for possible later use
 saveRDS(biomod_data, file = paste0(sps$Sps[1],"/",sps$Sps[1],".base.Rds"))
@@ -162,7 +158,7 @@ biomod_projection_2050 <- BIOMOD_Projection(
   new.env = expl_2050,
   proj.name = '2050',
   binary.meth = 'TSS',
-  compress = FALSE,
+  compress = 'xz',
   build.clamping.mask = FALSE)
 
 # Create 2050 ensemble projections
@@ -179,7 +175,7 @@ biomod_projection_2100 <- BIOMOD_Projection(
   new.env = expl_2100,
   proj.name = '2100',
   binary.meth = 'TSS',
-  compress = FALSE,
+  compress = 'xz',
   build.clamping.mask = FALSE)
 
 # Create 2100 ensemble projections
