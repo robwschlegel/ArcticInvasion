@@ -53,7 +53,7 @@ loadRData <- function(fileName){
 }
 
 # Choose a species
-sps_choice <- sps_files[2]
+sps_choice <- sps_files[4]
 print(paste0("Began run on ",sps_choice))
 
 # NB: Focus on zooplankton group first
@@ -65,7 +65,7 @@ print(paste0("Began run on ",sps_choice))
 # Load the species
 sps <- read_csv(sps_choice) %>% 
   mutate(env_index = as.vector(knnx.index(as.matrix(global_coords[,c("s1", "s2")]),
-                                          as.matrix(.[,c("lon", "lat")]), k = 1))) %>%
+                                          as.matrix(.[,2:3]), k = 1))) %>%
   left_join(global_coords, by = "env_index") %>% 
   dplyr::select(Sps, s1, s2) %>%
   dplyr::rename(lon = s1, lat = s2)
