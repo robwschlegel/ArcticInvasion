@@ -134,13 +134,8 @@ biomod_pipeline <- function(sps_choice){
   # biomod_model <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,".models.out"))
   
   # Build the ensemble models
-<<<<<<< HEAD
-  # It looks like the ensembles aren't going to be needed
-  # This is because the projections produce the needed binary output files
-=======
     # It looks like the ensembles aren't going to be needed
     # This is because the projections produce the needed binary output files
->>>>>>> aa092eeb384465d1de7c9d5f2b57cc7eea6c21ed
   # biomod_ensemble <- BIOMOD_EnsembleModeling(
   #   modeling.output = biomod_model,
   #   eval.metric = 'TSS',
