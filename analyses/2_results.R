@@ -29,40 +29,45 @@ loadRData <- function(fileName){
   get(ls()[ls() != "fileName"])
 }
 
-biomod_ensemble_projection <- loadRData("Aebu/proj_present/Aebu.present.ensemble.projection.out")
-plot(biomod_ensemble_projection)
+# biomod_ensemble_projection <- loadRData("Aebu/proj_present/Aebu.present.ensemble.projection.out")
+# plot(biomod_ensemble_projection)
 
-test_raster <- raster("Aebu/proj_present/proj_present_Aebu_TSSbin.gri")
-plot(test_raster)
-
-writeRaster(test_raster, "Aebu/proj_present/proj_present_Aebu_TSSbin.asc")
+biomod_data <- readRDS("Bsch/Bsch.base.Rds")
+file_name <- "Bsch/Bsch.Bsch.models.out"
+biomod_model <- loadRData(file_name)
+biomod_projection <- loadRData("Bsch/proj_present/Bsch.present.projection.out")
 
 
 # 3: Results --------------------------------------------------------------
 
 # check data format
-# biomod_data
+biomod_data
 
 # Check plot of data
 # plot(biomod_data)
 
 # Have a look at the outputs
-# biomod_model
+biomod_model
+
+# Get list of variables used
+biomod_var <- biomod_model@expl.var.names
+
+# Get the TSS score cutoffs for binary presence/absence
+biomod_cutoff <- as.data.frame(biomod_model@models.evaluation@val)
 
 # Relative importance of exploratory variables
-# variable_importances <- get_variables_importance(biomod_model)
-# variable_importances
+variable_importances <- get_variables_importance(biomod_model)
+variable_importances
 
 # Get all models evaluation
-# evaluate()
-# biomod_eval <- get_evaluations(biomod_model)
-# dimnames(biomod_eval)
+# evaluate(biomod_model, biomod_data, stat = 'TSS') # Doesn't run...
+biomod_eval <- get_evaluations(biomod_model)
+dimnames(biomod_eval)
 
-# biomod_eval[,,,"RUN1","PA5"]
+biomod_eval["TSS",,,,]
 
 # Visualise quality of different models
-# models_scores_graph(biomod_model)
-
+models_scores_graph(biomod_model)
 # biomod_model@models.computed
 
 # Plot projections
@@ -74,21 +79,42 @@ writeRaster(test_raster, "Aebu/proj_present/proj_present_Aebu_TSSbin.asc")
 # present_predictions
 
 # Look at particular aspects of predictions
-# biomod2::free()
+biomod2::free(biomod_projection)
+
 
 # 4: Visuals --------------------------------------------------------------
 
+# Load rasters
+ensemble_raster <- raster("Aebu/proj_present/proj_present_Aebu_TSSbin.gri")
+maxent_raster <- raster("Aebu/Aebu_binary.tif")
+
 # Convert raster to data frame
-test_df <- as.data.frame(test_raster, xy = TRUE) %>% 
+ensemble_df <- as.data.frame(ensemble_raster, xy = TRUE) %>% 
   mutate(x = plyr::round_any(x, 0.25), 
          y = plyr::round_any(y, 0.25)) %>% 
   group_by(x, y) %>% 
-  summarise(mean_layer = round(mean(layer.1, na.rm = TRUE))) %>% 
+  summarise(ensemble = round(mean(layer.1, na.rm = TRUE))) %>% 
   ungroup() %>% 
   na.omit()
+maxent_df <- as.data.frame(maxent_raster, xy = TRUE) %>% 
+  mutate(x = plyr::round_any(x, 0.25), 
+         y = plyr::round_any(y, 0.25)) %>% 
+  group_by(x, y) %>% 
+  summarise(maxent = round(mean(Aebu_binary, na.rm = TRUE))) %>% 
+  ungroup() %>% 
+  na.omit()
+both_df <- left_join(ensemble_df, maxent_df, by = c("x", "y")) %>% 
+  mutate(both = ifelse(ensemble == 1 & maxent == 1, 1, 0)) %>% 
+  pivot_longer(cols = ensemble:both, names_to = "Model", values_to = "Binary")
 
-ggplot(data = test_df, aes(x = x, y = y)) +
-  geom_tile(aes(fill = as.factor(mean_layer)))
+comparison_plot <- ggplot(data = both_df, aes(x = x, y = y)) +
+  borders(fill = "grey20", colour = "black") +
+  geom_tile(aes(fill = as.factor(Binary))) +
+  labs(x = NULL, y = NULL, fill = "Presence") +
+  scale_fill_manual(values = c("grey80", "forestgreen")) +
+  facet_wrap(~Model) +
+  coord_quickmap(expand = F)
+ggsave(plot = comparison_plot, filename = "graph/Aebu_comparison.png", width = 20, height = 4)
 
 
 # 5: Process --------------------------------------------------------------
