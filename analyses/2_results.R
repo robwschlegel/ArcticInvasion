@@ -3,11 +3,9 @@
 # and process them into a format that may be compared to 
 # Jesi's Maxent results
 # 1: Setup the environment
-# 2: Load biomod results
-# 3: Look at results
+# 2: Create table of variables used
+# 3: Create table of model results
 # 4: Create visuals
-# 5: Process results into usable outputs
-# 6: Save processed outputs
 
 
 # 1: Setup ----------------------------------------------------------------
@@ -26,45 +24,79 @@ loadRData <- function(fileName){
 }
 
 # The species occurrence data
-sps_files_short <- dir("data/occurrence", full.names = F)
+sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # Choose species
-sps_choice <- sps_files_short[5]
-
-# Extract name abreviation
-sps_name <- str_remove(sps_choice, pattern = "_near.csv")
+# sps <- sps_names[5]
 
 
-# 2: Load biomod ----------------------------------------------------------
+# 2: Create table of variables used ---------------------------------------
+
+# The wrapper functions
+biomod_var_table <- function(sps){
+  
+  # The full model results
+  biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
+  
+  # Get list of variables used
+  biomod_var <- as.data.frame(biomod_model@expl.var.names) %>% 
+    `colnames<-`(c("var")) %>%
+    mutate(sps = sps,
+           var_count = 1:n()) %>% 
+    pivot_wider(names_from = var_count, values_from = var, names_prefix = "Var")
+  return(biomod_var)
+}
+
+# Run it all
+all_var_table <- plyr::ldply(sps_names, biomod_var_table, .parallel = T)
+
+# Save
+write_csv(all_var_table, "metadata/all_var_table.csv")
 
 
-# biomod_ensemble_projection <- loadRData("Aebu/proj_present/Aebu.present.ensemble.projection.out")
-# plot(biomod_ensemble_projection)
+# 3: Create table of model results ----------------------------------------
 
-# biomod_data <- readRDS("Bsch/Bsch.base.Rds")
-# file_name <- "Bsch/Bsch.Bsch.models.out"
-biomod_model <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,".models.out"))
-# biomod_projection <- loadRData("Bsch/proj_present/Bsch.present.projection.out")
+# The wrapper functions
+biomod_res_table <- function(sps){
+  
+  # The full model results
+  biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
+  
+  # Get the TSS scores, cutoffs for binary presence/absence, and specificity/sensitivity
+  biomod_cutoff <- plyr::adply(get_evaluations(biomod_model), c(1,3,4,5)) %>% 
+    dplyr::rename(test = X1, model = X2, run = X3, PA = X4, score = Testing.data) %>% 
+    mutate(sps = sps) %>% 
+    dplyr::select(sps, everything()) %>% 
+    group_by(sps, test, model) %>% 
+    summarise_if(is.numeric, mean) %>% 
+    ungroup() %>% 
+    mutate_if(is.numeric, round, 2) %>% 
+    mutate(Cutoff = round(Cutoff))
+  return(biomod_cutoff)
+}
 
+# Run it all
+all_res_table <- plyr::ldply(sps_names, biomod_res_table, .parallel = T)
 
-# 3: Results --------------------------------------------------------------
-
-
-# Get list of variables used
-biomod_var <- biomod_model@expl.var.names
-
-# Get the TSS scores, cutoffs for binary presence/absence, and specificity/sensitivity
-biomod_cutoff <- get_evaluations(biomod_model)
-
-# Visualise quality of different models
-# models_scores_graph(biomod_model)
+# Save
+write_csv(all_res_table, "metadata/all_res_table.csv")
 
 
 # 4: Visuals --------------------------------------------------------------
 
+# Visualise quality of different models
+# models_scores_graph(biomod_model)
+
 # Load rasters
-ensemble_raster <- raster("Aebu/proj_present/proj_present_Aebu_TSSbin.gri")
-maxent_raster <- raster("Aebu/Aebu_binary.tif")
+# NB: Not all species have their MaxEnt data uploaded yet so this needs to be confirmed first
+if(file.exists(paste0("data/maxent/",sps_name,"_binary.tif"))){
+  ensemble_raster <- raster(paste0(sps_name,"/proj_present/proj_present_",sps_name,"_TSSbin.gri"))
+  maxent_raster <- raster(paste0("data/maxent/",sps_name,"_binary.tif"))
+  ensemble_2050_raster <- raster(paste0(sps_name,"/proj_2050/proj_2050_",sps_name,"_TSSbin.gri"))
+  maxent_2050_raster <- raster(paste0("data/maxent/",sps_name,"_2050_45_avg_binary.tif"))
+  ensemble_2100_raster <- raster(paste0(sps_name,"/proj_2100/proj_2100_",sps_name,"_TSSbin.gri"))
+  maxent_2100_raster <- raster(paste0("data/maxent/",sps_name,"_2100_45_avg_binary.tif"))
+}
 
 # Convert raster to data frame
 ensemble_df <- as.data.frame(ensemble_raster, xy = TRUE) %>% 
@@ -93,11 +125,5 @@ comparison_plot <- ggplot(data = both_df, aes(x = x, y = y)) +
   facet_wrap(~Model) +
   coord_quickmap(expand = F)
 ggsave(plot = comparison_plot, filename = "graph/Aebu_comparison.png", width = 20, height = 4)
-
-
-# 5: Process --------------------------------------------------------------
-
-
-# 6: Saved ----------------------------------------------------------------
 
 
