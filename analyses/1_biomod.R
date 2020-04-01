@@ -46,15 +46,8 @@ top_var <- read_csv("metadata/top_var.csv") %>%
   dplyr::select(-name) %>% 
   na.omit()
 
-# Function for re-loading .RData files as necessary
-#loads an RData file, and returns it
-loadRData <- function(fileName){
-  load(fileName)
-  get(ls()[ls() != "fileName"])
-}
-
 # Choose a species
-# sps_choice <- sps_files[18]
+# sps_choice <- sps_files[3]
 # NB: Focus on zooplankton group first
 # c(2, 4, 18)
 
@@ -78,15 +71,16 @@ biomod_pipeline <- function(sps_choice){
   sps_name <- sps$Sps[1]
   
   # Determine number of pseudo-absences to use
-  if(nrow(sps) <= 1000){
-    PA_absence_count <- 1000
-  } else{
-    PA_absence_count <- 10000
-  }
+    # Looking more closely in the literature this doesn't seem necessary
+  # if(nrow(sps) <= 1000){
+  #   PA_absence_count <- 1000
+  # } else{
+  #   PA_absence_count <- 10000
+  # }
   
   # Filter out the top variables
   top_var_sub <- top_var %>% 
-    filter(str_remove(Code, pattern = "_near") == sps_name) %>% 
+    filter(Code == sps_name) %>% 
     mutate(value = paste0(value,".asc"))
   
   # Load the top variables for the species
@@ -109,8 +103,8 @@ biomod_pipeline <- function(sps_choice){
     resp.xy = as.matrix(sps[,2:3]),
     resp.name = sps_name,
     expl.var = expl, 
-    PA.nb.rep = 5,
-    PA.nb.absences = PA_absence_count) # Or perhaps always use 10,000
+    PA.nb.rep = 1, #5, # It seems like 5 runs is unnecessary if 10,000 points are used
+    PA.nb.absences = 10000)
   # biomod_data <- readRDS(paste0(sps_name,"/",sps_name,".base.Rds"))
   
   # Model options
@@ -221,5 +215,5 @@ biomod_pipeline <- function(sps_choice){
 
 # 7: Run the pipeline -----------------------------------------------------
 
-plyr::l_ply(sps_files[7:8], biomod_pipeline, .parallel = TRUE)
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
 
