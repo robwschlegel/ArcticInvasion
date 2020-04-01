@@ -110,7 +110,7 @@ biomod_pipeline <- function(sps_choice){
     resp.name = sps_name,
     expl.var = expl, 
     PA.nb.rep = 5,
-    PA.nb.absences = PA_absence_count)
+    PA.nb.absences = PA_absence_count) # Or perhaps always use 10,000
   # biomod_data <- readRDS(paste0(sps_name,"/",sps_name,".base.Rds"))
   
   # Model options
@@ -124,7 +124,7 @@ biomod_pipeline <- function(sps_choice){
     biomod_data,
     models = c('GLM', 'ANN', 'SRE', 'RF'),
     models.options = biomod_option,
-    NbRunEval = 3,
+    NbRunEval = 5,
     DataSplit = 70,
     VarImport = 0,
     models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'FAR', 'SR', 'ACCURACY', 'BIAS', 'POD', 'CSI', 'ETS'),

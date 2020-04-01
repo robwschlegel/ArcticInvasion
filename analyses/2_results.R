@@ -16,11 +16,7 @@
 library(tidyverse)
 library(biomod2)
 library(sp)
-# library(FNN)
 library(doParallel); registerDoParallel(cores = 50)
-
-
-# 2: load biomod ----------------------------------------------------------
 
 # Function for re-loading .RData files as necessary
 #loads an RData file, and returns it
@@ -29,57 +25,39 @@ loadRData <- function(fileName){
   get(ls()[ls() != "fileName"])
 }
 
+# The species occurrence data
+sps_files_short <- dir("data/occurrence", full.names = F)
+
+# Choose species
+sps_choice <- sps_files_short[5]
+
+# Extract name abreviation
+sps_name <- str_remove(sps_choice, pattern = "_near.csv")
+
+
+# 2: Load biomod ----------------------------------------------------------
+
+
 # biomod_ensemble_projection <- loadRData("Aebu/proj_present/Aebu.present.ensemble.projection.out")
 # plot(biomod_ensemble_projection)
 
-biomod_data <- readRDS("Bsch/Bsch.base.Rds")
-file_name <- "Bsch/Bsch.Bsch.models.out"
-biomod_model <- loadRData(file_name)
-biomod_projection <- loadRData("Bsch/proj_present/Bsch.present.projection.out")
+# biomod_data <- readRDS("Bsch/Bsch.base.Rds")
+# file_name <- "Bsch/Bsch.Bsch.models.out"
+biomod_model <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,".models.out"))
+# biomod_projection <- loadRData("Bsch/proj_present/Bsch.present.projection.out")
 
 
 # 3: Results --------------------------------------------------------------
 
-# check data format
-biomod_data
-
-# Check plot of data
-# plot(biomod_data)
-
-# Have a look at the outputs
-biomod_model
 
 # Get list of variables used
 biomod_var <- biomod_model@expl.var.names
 
-# Get the TSS score cutoffs for binary presence/absence
-biomod_cutoff <- as.data.frame(biomod_model@models.evaluation@val)
-
-# Relative importance of exploratory variables
-variable_importances <- get_variables_importance(biomod_model)
-variable_importances
-
-# Get all models evaluation
-# evaluate(biomod_model, biomod_data, stat = 'TSS') # Doesn't run...
-biomod_eval <- get_evaluations(biomod_model)
-dimnames(biomod_eval)
-
-biomod_eval["TSS",,,,]
+# Get the TSS scores, cutoffs for binary presence/absence, and specificity/sensitivity
+biomod_cutoff <- get_evaluations(biomod_model)
 
 # Visualise quality of different models
-models_scores_graph(biomod_model)
-# biomod_model@models.computed
-
-# Plot projections
-# plot(biomod_projection)
-
-# Get predictions
-# NB: There are many biomod2::get_ functions for looking at results more closely
-# present_predictions <- get_predictions(biomod_projection)
-# present_predictions
-
-# Look at particular aspects of predictions
-biomod2::free(biomod_projection)
+# models_scores_graph(biomod_model)
 
 
 # 4: Visuals --------------------------------------------------------------
