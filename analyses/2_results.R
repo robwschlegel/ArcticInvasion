@@ -38,6 +38,9 @@ biomod_var_table <- function(sps){
   # The full model results
   biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
   
+  # Visualise quality of different models
+  # models_scores_graph(biomod_model)
+  
   # Get list of variables used
   biomod_var <- as.data.frame(biomod_model@expl.var.names) %>% 
     `colnames<-`(c("var")) %>%
@@ -84,46 +87,67 @@ write_csv(all_res_table, "metadata/all_res_table.csv")
 
 # 4: Visuals --------------------------------------------------------------
 
-# Visualise quality of different models
-# models_scores_graph(biomod_model)
-
-# Load rasters
-# NB: Not all species have their MaxEnt data uploaded yet so this needs to be confirmed first
-if(file.exists(paste0("data/maxent/",sps_name,"_binary.tif"))){
-  ensemble_raster <- raster(paste0(sps_name,"/proj_present/proj_present_",sps_name,"_TSSbin.gri"))
-  maxent_raster <- raster(paste0("data/maxent/",sps_name,"_binary.tif"))
-  ensemble_2050_raster <- raster(paste0(sps_name,"/proj_2050/proj_2050_",sps_name,"_TSSbin.gri"))
-  maxent_2050_raster <- raster(paste0("data/maxent/",sps_name,"_2050_45_avg_binary.tif"))
-  ensemble_2100_raster <- raster(paste0(sps_name,"/proj_2100/proj_2100_",sps_name,"_TSSbin.gri"))
-  maxent_2100_raster <- raster(paste0("data/maxent/",sps_name,"_2100_45_avg_binary.tif"))
+# Convenience function to process a raster into a ggplot friendly dataframe
+raster_to_df <- function(raster_file, model_name){
+  res <- as.data.frame(raster(raster_file), xy = TRUE) %>%
+    na.omit() %>% 
+    mutate(x = plyr::round_any(x, 0.25), 
+           y = plyr::round_any(y, 0.25)) %>% 
+    `colnames<-`(c("x", "y", "val")) %>% 
+    group_by(x, y) %>% 
+    summarise(val = round(mean(val, na.rm = TRUE))) %>% 
+    ungroup() %>% 
+    `colnames<-`(c("x", "y", model_name))
+  return(res)
 }
 
-# Convert raster to data frame
-ensemble_df <- as.data.frame(ensemble_raster, xy = TRUE) %>% 
-  mutate(x = plyr::round_any(x, 0.25), 
-         y = plyr::round_any(y, 0.25)) %>% 
-  group_by(x, y) %>% 
-  summarise(ensemble = round(mean(layer.1, na.rm = TRUE))) %>% 
-  ungroup() %>% 
-  na.omit()
-maxent_df <- as.data.frame(maxent_raster, xy = TRUE) %>% 
-  mutate(x = plyr::round_any(x, 0.25), 
-         y = plyr::round_any(y, 0.25)) %>% 
-  group_by(x, y) %>% 
-  summarise(maxent = round(mean(Aebu_binary, na.rm = TRUE))) %>% 
-  ungroup() %>% 
-  na.omit()
-both_df <- left_join(ensemble_df, maxent_df, by = c("x", "y")) %>% 
-  mutate(both = ifelse(ensemble == 1 & maxent == 1, 1, 0)) %>% 
-  pivot_longer(cols = ensemble:both, names_to = "Model", values_to = "Binary")
+# Convenience function for plotting
+comparison_plot <- function(df){
+  comparison_fig <- ggplot(data = df, aes(x = x, y = y)) +
+    borders(fill = "grey20", colour = "black") +
+    geom_tile(aes(fill = as.factor(Binary))) +
+    labs(x = NULL, y = NULL, fill = "Presence") +
+    scale_fill_manual(values = c("grey80", "forestgreen")) +
+    facet_wrap(~Model) +
+    coord_quickmap(expand = F)
+  return(comparison_fig)
+}
 
-comparison_plot <- ggplot(data = both_df, aes(x = x, y = y)) +
-  borders(fill = "grey20", colour = "black") +
-  geom_tile(aes(fill = as.factor(Binary))) +
-  labs(x = NULL, y = NULL, fill = "Presence") +
-  scale_fill_manual(values = c("grey80", "forestgreen")) +
-  facet_wrap(~Model) +
-  coord_quickmap(expand = F)
-ggsave(plot = comparison_plot, filename = "graph/Aebu_comparison.png", width = 20, height = 4)
+# Wraper to run visuals for all species
+biomod_visuals <- function(sps){
+  # Load rasters
+  # NB: Not all species have their MaxEnt data uploaded yet so this needs to be confirmed first
+  if(file.exists(paste0("data/maxent/",sps,"_binary.tif"))){
+    
+    # Load raster files as formatted dataframes
+    ensemble_df <- raster_to_df(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "ensemble")
+    maxent_df <- raster_to_df(paste0("data/maxent/",sps,"_binary.tif"), "maxent")
+    ensemble_2050_df <- raster_to_df(paste0(sps,"/proj_2050/proj_2050_",sps,"_TSSbin.gri"), "ensemble_2050")
+    maxent_2050_df <- raster_to_df(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif"), "maxent_2050")
+    ensemble_2100_df <- raster_to_df(paste0(sps,"/proj_2100/proj_2100_",sps,"_TSSbin.gri"), "ensemble_2100")
+    maxent_2100_df <- raster_to_df(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif"), "maxent_2100")
+    
+    # Combine files for plotting
+    both_df <- left_join(ensemble_df, maxent_df, by = c("x", "y")) %>% 
+      mutate(both = ifelse(ensemble == 1 & maxent == 1, 1, 0)) %>% 
+      pivot_longer(cols = ensemble:both, names_to = "Model", values_to = "Binary")
+    both_2050_df <- left_join(ensemble_2050_df, maxent_2050_df, by = c("x", "y")) %>% 
+      mutate(both_2050 = ifelse(ensemble_2050 == 1 & maxent_2050 == 1, 1, 0)) %>% 
+      pivot_longer(cols = ensemble_2050:both_2050, names_to = "Model", values_to = "Binary")
+    both_2100_df <- left_join(ensemble_2100_df, maxent_2100_df, by = c("x", "y")) %>% 
+      mutate(both_2100 = ifelse(ensemble_2100 == 1 & maxent_2100 == 1, 1, 0)) %>% 
+      pivot_longer(cols = ensemble_2100:both_2100, names_to = "Model", values_to = "Binary")
+    
+    # Create figures
+    comparison_present <- comparison_plot(both_df)
+    ggsave(plot = comparison_present, filename = paste0("graph/comparison/",sps,"_comparison.png"), width = 20, height = 4)
+    comparison_2050 <- comparison_plot(both_2050_df)
+    ggsave(plot = comparison_2050, filename = paste0("graph/comparison/",sps,"_comparison_2050.png"), width = 20, height = 4)
+    comparison_2100 <- comparison_plot(both_2100_df)
+    ggsave(plot = comparison_2100, filename = paste0("graph/comparison/",sps,"_comparison_2100.png"), width = 20, height = 4)
+  }
+}
 
+# Run them all
+plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
 
