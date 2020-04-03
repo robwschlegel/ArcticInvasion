@@ -117,11 +117,11 @@ comparison_plot <- function(df){
 biomod_visuals <- function(sps){
   # Load rasters
   # NB: Not all species have their MaxEnt data uploaded yet so this needs to be confirmed first
-  if(file.exists(paste0("data/maxent/",sps,"_binary.tif"))){
+  if(file.exists(paste0("data/maxent/",sps,"_avg_binary.tif"))){
     
     # Load raster files as formatted dataframes
     ensemble_df <- raster_to_df(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "ensemble")
-    maxent_df <- raster_to_df(paste0("data/maxent/",sps,"_binary.tif"), "maxent")
+    maxent_df <- raster_to_df(paste0("data/maxent/",sps,"_avg_binary.tif"), "maxent")
     ensemble_2050_df <- raster_to_df(paste0(sps,"/proj_2050/proj_2050_",sps,"_TSSbin.gri"), "ensemble_2050")
     maxent_2050_df <- raster_to_df(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif"), "maxent_2050")
     ensemble_2100_df <- raster_to_df(paste0(sps,"/proj_2100/proj_2100_",sps,"_TSSbin.gri"), "ensemble_2100")
