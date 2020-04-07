@@ -1,7 +1,6 @@
 # 2_results.R
 # The purpose of this script is to take the outputs of 1_biomod.R
-# and process them into a format that may be compared to 
-# Jesi's Maxent results
+# and process them into a format that may be compared to Jesi's Maxent results
 # 1: Setup the environment
 # 2: Create table of variables used
 # 3: Create table of model results
@@ -17,7 +16,6 @@ library(sp)
 library(doParallel); registerDoParallel(cores = 50)
 
 # Function for re-loading .RData files as necessary
-#loads an RData file, and returns it
 loadRData <- function(fileName){
   load(fileName)
   get(ls()[ls() != "fileName"])
