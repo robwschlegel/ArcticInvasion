@@ -2,11 +2,8 @@
 # The purose of this script is to take all of the results from Bbiomod2
 # and MaxEnt and merge them together into one final binary map for each species.
 # 1: Setup the environment
-# 2: Load biomod2 and MaxEnt results
-# 3: Find cutoff values
-# 4: Average all results
-# 5: Convert the binary results to raster format
-# 6: Run the pipeline
+# 2: Functions
+# 3: Run the pipeline
 
 # 1: Setup ----------------------------------------------------------------
 
@@ -29,6 +26,8 @@ sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near
 # Choose species
 # sps <- sps_names[5]
 
+
+# 2: Functions ------------------------------------------------------------
 
 # convenience function for loading MaxEnt data
 load_maxent <- function(maxent_file){
@@ -59,14 +58,13 @@ raster_to_df_binary <- function(layer_num, proj_x, res_table){
 }
 
 # Function that creates the final mean binary value for a porjection
-proj_binary_mean <- function(proj_biomod, proj_maxent, res_table){
+proj_binary_mean <- function(proj_biomod, proj_maxent, res_table, proj_name){
   
   # Extract all of the models as a long data.frame
   df_biomod <- plyr::ldply(1:length(proj_biomod@layers), raster_to_df_binary,
                            .parallel = F, proj_x = proj_biomod, res_table = res_table)
   
   # Create rounded mean binary values per model
-  # df_biomod_mean <- plyr::ddply(df_present, c("model", "x", "y"), mean, .parallel = T)
   # system.time(
   df_biomod_mean <- lazy_dt(df_biomod) %>% 
     dplyr::select(-run) %>% 
@@ -75,6 +73,7 @@ proj_binary_mean <- function(proj_biomod, proj_maxent, res_table){
     ungroup() %>% 
     data.frame()
   # ) # 340 seconds
+  saveRDS(df_biomod_mean, paste0("data/biomod/",sps,"_df_",proj_name,".Rds"))
   
   # Add MaxEnt binary and calculate final binary result
   df_res <- rbind(df_biomod_mean, proj_maxent)
@@ -85,6 +84,7 @@ proj_binary_mean <- function(proj_biomod, proj_maxent, res_table){
     ungroup() %>% 
     data.frame()
   # ) # 63 seconds
+  rm(df_biomod_mean); gc()
   return(df_res)
 }
 
@@ -105,25 +105,10 @@ df_to_raster <- function(df_proj){
 # Function that crawls through species files, finds cutoffs, and creates binary output per model
 sps_binary <- function(sps){
   
-  # 2: Load -----------------------------------------------------------------
-  
-  print(paste0("Began loading ",sps))
-  
-  # The MaxEnt binary results
-  maxent_present <- load_maxent(paste0("data/maxent/",sps,"_avg_binary.tif"))
-  maxent_2050 <- load_maxent(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif"))
-  maxent_2100 <- load_maxent(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif"))
-  
-  # The biomod non-binary results
-  biomod_present <- get_predictions(loadRData(paste0(sps,"/proj_present/",sps,".present.projection.out")))
-  biomod_2050 <- get_predictions(loadRData(paste0(sps,"/proj_2050/",sps,".2050.projection.out")))
-  biomod_2100 <- get_predictions(loadRData(paste0(sps,"/proj_2100/",sps,".2100.projection.out")))
+  print(paste0("Began run on ",sps," at ", Sys.time()))
   
   # The biomod model results
   biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
-  
-  
-  # 3: Cutoffs --------------------------------------------------------------
   
   # The cutoff table
   res_table <- plyr::adply(get_evaluations(biomod_model), c(1,3,4,5)) %>% 
@@ -132,34 +117,39 @@ sps_binary <- function(sps){
     dplyr::select(sps, everything()) %>% 
     filter(test == "TSS")
   
+  # Present projections
+  print(paste0("Present projections for ",sps," at ",Sys.time()))
+  proj_present <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_present/",sps,".present.projection.out"))), 
+                                   load_maxent(paste0("data/maxent/",sps,"_avg_binary.tif")),
+                                   res_table, "present")
+  writeRaster(df_to_raster(proj_present), paste0("data/biomod/",sps,"_binary_present.asc"))
+  rm(proj_present); gc()
   
-  # 4: Mean binary results --------------------------------------------------
+  # 2050 projections
+  print(paste0("2050 projections for ",sps," at ",Sys.time()))
+  proj_2050 <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_2050/",sps,".2050.projection.out"))), 
+                                load_maxent(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif")), 
+                                res_table, "2050")
+  writeRaster(df_to_raster(proj_2050), paste0("data/biomod/",sps,"_binary_2050.asc"))
+  rm(proj_2050); gc()
   
-  print(paste0("Calculating binary means for ",sps))
-  
-  proj_present <- proj_binary_mean(biomod_present, maxent_present, res_table)
-  proj_2050 <- proj_binary_mean(biomod_2050, maxent_2050, res_table)
-  proj_2100 <- proj_binary_mean(biomod_2100, maxent_2100, res_table)
-  
-  
-  # 5: Convert to raster ----------------------------------------------------
-  
-  print(paste0("Saving ",sps))
-  
-  raster_present <- df_to_raster(proj_present)
-  writeRaster(raster_present, paste0("data/biomod/",sps,"_binary_present.asc"))
-  raster_2050 <- df_to_raster(proj_2050)
-  writeRaster(raster_2050, paste0("data/biomod/",sps,"_binary_2050.asc"))
-  raster_2100 <- df_to_raster(proj_2100)
-  writeRaster(raster_2100, paste0("data/biomod/",sps,"_binary_2100.asc"))
+  # 2100 projections
+  print(paste0("2100 projections for ",sps," at ",Sys.time()))
+  proj_2100 <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_2100/",sps,".2100.projection.out"))), 
+                                load_maxent(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif")), 
+                                res_table, "2100")
+  writeRaster(df_to_raster(proj_2100), paste0("data/biomod/",sps,"_binary_2100.asc"))
+  rm(proj_2100); gc()
 }
-
-
+  
+  
 # 6: Run the pipeline -----------------------------------------------------
 
 # Run one
 # sps_binary(sps_names[1])
 
 # Run all
-plyr::l_ply(sps_names, sps_binary, .parallel = TRUE)
+  # NB: Uses to much RAM when running more than a few at a time
+registerDoParallel(cores = 5) 
+plyr::l_ply(sps_names, sps_binary, .parallel = FALSE)
 
