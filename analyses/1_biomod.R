@@ -215,5 +215,9 @@ biomod_pipeline <- function(sps_choice){
 
 # 7: Run the pipeline -----------------------------------------------------
 
-plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
+# Run one
+# biomod_pipeline(sps_files[17])
+
+# Run them all
+# plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
 

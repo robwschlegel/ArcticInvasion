@@ -3,7 +3,7 @@
 # and MaxEnt and merge them together into one final binary map for each species.
 # 1: Setup the environment
 # 2: Functions
-# 3: Run the pipeline
+# 3: Calculate ensemble models
 
 # 1: Setup ----------------------------------------------------------------
 
@@ -24,7 +24,7 @@ loadRData <- function(fileName){
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # Choose species
-# sps <- sps_names[5]
+# sps <- sps_names[14]
 
 
 # 2: Functions ------------------------------------------------------------
@@ -48,6 +48,9 @@ raster_to_df_binary <- function(layer_num, proj_x, res_table){
   res_table_sub <- res_table %>% 
     filter(run == sub_cutoff[3], model == sub_cutoff[4])
   
+  # Stop run if the model TSS is not >=0.7
+  if(res_table_sub$score[1] < 0.7) return()
+  
   # Convert to binary
   proj_sub_df_binary <- proj_sub_df %>% 
     `colnames<-`(c("x", "y", "z")) %>% 
@@ -58,11 +61,11 @@ raster_to_df_binary <- function(layer_num, proj_x, res_table){
 }
 
 # Function that creates the final mean binary value for a porjection
-proj_binary_mean <- function(proj_biomod, proj_maxent, res_table, proj_name){
+proj_binary_mean <- function(proj_biomod, proj_maxent, biomod_cutoff, res_table, proj_name){
   
   # Extract all of the models as a long data.frame
-  df_biomod <- plyr::ldply(1:length(proj_biomod@layers), raster_to_df_binary,
-                           .parallel = F, proj_x = proj_biomod, res_table = res_table)
+  df_biomod <- plyr::ldply(1:length(proj_biomod@layers), raster_to_df_binary, 
+                           .parallel = F, res_table)
   
   # Create rounded mean binary values per model
   # system.time(
@@ -73,7 +76,7 @@ proj_binary_mean <- function(proj_biomod, proj_maxent, res_table, proj_name){
     ungroup() %>% 
     data.frame()
   # ) # 340 seconds
-  saveRDS(df_biomod_mean, paste0("data/biomod/",sps,"_df_",proj_name,".Rds"))
+  saveRDS(df_biomod_mean, paste0("data/biomod/",res_table$sps[1],"_df_",proj_name,".Rds"))
   
   # Add MaxEnt binary and calculate final binary result
   df_res <- rbind(df_biomod_mean, proj_maxent)
@@ -107,11 +110,8 @@ sps_binary <- function(sps){
   
   print(paste0("Began run on ",sps," at ", Sys.time()))
   
-  # The biomod model results
-  biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
-  
   # The cutoff table
-  res_table <- plyr::adply(get_evaluations(biomod_model), c(1,3,4,5)) %>% 
+  res_table <- plyr::adply(get_evaluations(loadRData(paste0(sps,"/",sps,".",sps,".models.out"))), c(1,3,4,5)) %>% 
     dplyr::rename(test = X1, model = X2, run = X3, PA = X4, score = Testing.data) %>% 
     mutate(sps = sps) %>% 
     dplyr::select(sps, everything()) %>% 
@@ -119,7 +119,7 @@ sps_binary <- function(sps){
   
   # Present projections
   print(paste0("Present projections for ",sps," at ",Sys.time()))
-  proj_present <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_present/",sps,".present.projection.out"))), 
+  proj_present <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_present/",sps,".present.projection.out"))),
                                    load_maxent(paste0("data/maxent/",sps,"_avg_binary.tif")),
                                    res_table, "present")
   writeRaster(df_to_raster(proj_present), paste0("data/biomod/",sps,"_binary_present.asc"))
@@ -127,8 +127,8 @@ sps_binary <- function(sps){
   
   # 2050 projections
   print(paste0("2050 projections for ",sps," at ",Sys.time()))
-  proj_2050 <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_2050/",sps,".2050.projection.out"))), 
-                                load_maxent(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif")), 
+  proj_2050 <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_2050/",sps,".2050.projection.out"))),
+                                load_maxent(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif")),
                                 res_table, "2050")
   writeRaster(df_to_raster(proj_2050), paste0("data/biomod/",sps,"_binary_2050.asc"))
   rm(proj_2050); gc()
@@ -142,14 +142,14 @@ sps_binary <- function(sps){
   rm(proj_2100); gc()
 }
   
-  
-# 6: Run the pipeline -----------------------------------------------------
+
+# 3: Calculate ensemble models --------------------------------------------
 
 # Run one
-# sps_binary(sps_names[1])
+# sps_binary(sps_names[2])
 
 # Run all
   # NB: Uses to much RAM when running more than a few at a time
-registerDoParallel(cores = 5) 
-plyr::l_ply(sps_names, sps_binary, .parallel = FALSE)
+registerDoParallel(cores = 2)
+plyr::l_ply(sps_names[c(2,14)], sps_binary, .parallel = TRUE)
 
