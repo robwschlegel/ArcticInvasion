@@ -1,11 +1,11 @@
 # 2_results.R
 # The purpose of this script is to take the outputs of 1_biomod.R
-# and process them into a format that may be compared to 
-# Jesi's Maxent results
+# and process them into a format that may be compared to Jesi's Maxent results
 # 1: Setup the environment
 # 2: Create table of variables used
 # 3: Create table of model results
-# 4: Create visuals
+# 4: Create basic comparisons
+# 5: Create multi-model comparisons
 
 
 # 1: Setup ----------------------------------------------------------------
@@ -17,7 +17,6 @@ library(sp)
 library(doParallel); registerDoParallel(cores = 50)
 
 # Function for re-loading .RData files as necessary
-#loads an RData file, and returns it
 loadRData <- function(fileName){
   load(fileName)
   get(ls()[ls() != "fileName"])
@@ -69,23 +68,26 @@ biomod_res_table <- function(sps){
   biomod_cutoff <- plyr::adply(get_evaluations(biomod_model), c(1,3,4,5)) %>% 
     dplyr::rename(test = X1, model = X2, run = X3, PA = X4, score = Testing.data) %>% 
     mutate(sps = sps) %>% 
-    dplyr::select(sps, everything()) %>% 
-    group_by(sps, test, model) %>% 
-    summarise_if(is.numeric, mean) %>% 
-    ungroup() %>% 
-    mutate_if(is.numeric, round, 2) %>% 
-    mutate(Cutoff = round(Cutoff))
+    dplyr::select(sps, everything())
+  
   return(biomod_cutoff)
 }
 
 # Run it all
 all_res_table <- plyr::ldply(sps_names, biomod_res_table, .parallel = T)
-
-# Save
 write_csv(all_res_table, "metadata/all_res_table.csv")
 
+# Create a table that shows the mean results
+mean_res_table <- all_res_table %>% 
+  group_by(sps, test, model) %>% 
+  summarise_if(is.numeric, mean) %>%
+  ungroup() %>%
+  mutate_if(is.numeric, round, 2) %>%
+  mutate(Cutoff = round(Cutoff))
+write_csv(mean_res_table, "metadata/mean_res_table.csv")
 
-# 4: Visuals --------------------------------------------------------------
+
+# 3: Create basic comparisons ---------------------------------------------
 
 # Convenience function to process a raster into a ggplot friendly dataframe
 raster_to_df <- function(raster_file, model_name){
@@ -105,11 +107,12 @@ raster_to_df <- function(raster_file, model_name){
 comparison_plot <- function(df){
   comparison_fig <- ggplot(data = df, aes(x = x, y = y)) +
     borders(fill = "grey20", colour = "black") +
-    geom_tile(aes(fill = as.factor(Binary))) +
+    geom_tile(aes(fill = as.factor(z))) +
     labs(x = NULL, y = NULL, fill = "Presence") +
     scale_fill_manual(values = c("grey80", "forestgreen")) +
-    facet_wrap(~Model) +
-    coord_quickmap(expand = F)
+    facet_wrap(~model) +
+    coord_quickmap(expand = F) +
+    theme(legend.position = "bottom")
   return(comparison_fig)
 }
 
@@ -130,13 +133,13 @@ biomod_visuals <- function(sps){
     # Combine files for plotting
     both_df <- left_join(ensemble_df, maxent_df, by = c("x", "y")) %>% 
       mutate(both = ifelse(ensemble == 1 & maxent == 1, 1, 0)) %>% 
-      pivot_longer(cols = ensemble:both, names_to = "Model", values_to = "Binary")
+      pivot_longer(cols = ensemble:both, names_to = "model", values_to = "z")
     both_2050_df <- left_join(ensemble_2050_df, maxent_2050_df, by = c("x", "y")) %>% 
       mutate(both_2050 = ifelse(ensemble_2050 == 1 & maxent_2050 == 1, 1, 0)) %>% 
-      pivot_longer(cols = ensemble_2050:both_2050, names_to = "Model", values_to = "Binary")
+      pivot_longer(cols = ensemble_2050:both_2050, names_to = "model", values_to = "z")
     both_2100_df <- left_join(ensemble_2100_df, maxent_2100_df, by = c("x", "y")) %>% 
       mutate(both_2100 = ifelse(ensemble_2100 == 1 & maxent_2100 == 1, 1, 0)) %>% 
-      pivot_longer(cols = ensemble_2100:both_2100, names_to = "Model", values_to = "Binary")
+      pivot_longer(cols = ensemble_2100:both_2100, names_to = "model", values_to = "z")
     
     # Create figures
     comparison_present <- comparison_plot(both_df)
@@ -149,5 +152,61 @@ biomod_visuals <- function(sps){
 }
 
 # Run them all
-plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
+# plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
 
+
+# 5: Create multi-model comparisons ---------------------------------------
+# NB: This section relies on data created in 'analyses/3_ensemble.R'
+
+# Function that loads an .Rds file and rounds it to the nearest 0.25 degree resolution
+readRDS_0.25 <- function(file_name, projection){
+  df <- readRDS(file_name) %>% 
+    na.omit() %>% 
+    mutate(x = plyr::round_any(x, 0.25), 
+           y = plyr::round_any(y, 0.25),
+           model = paste0(model,"_",projection)) %>% 
+    group_by(model, x, y) %>% 
+    summarise(z = round(mean(z, na.rm = T))) %>% 
+    ungroup()
+}
+
+# Convenience function to process a raster into a long dataframe
+raster_to_long <- function(raster_file, model_name){
+  res <- as.data.frame(raster(raster_file), xy = TRUE) %>%
+    na.omit() %>% 
+    `colnames<-`(c("x", "y", "z")) %>% 
+    mutate(x = plyr::round_any(x, 0.25), 
+           y = plyr::round_any(y, 0.25),
+           model = model_name) %>% 
+    group_by(model, x, y) %>% 
+    summarise(z = round(mean(z, na.rm = TRUE))) %>% 
+    ungroup()
+  return(res)
+}
+
+# Wraper to run visuals for all species
+biomod_multi_visuals <- function(sps){
+  
+  # Load raster files as formatted dataframes
+  both_df <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_present.Rds"), "present"),
+                   raster_to_long(paste0("data/maxent/",sps,"_avg_binary.tif"), "maxent_present"))
+  both_2050_df <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2050.Rds"), "2050"),
+                        raster_to_long(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif"), "maxent_2050"))
+  both_2100_df <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2100.Rds"), "2100"),
+                        raster_to_long(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif"), "maxent_2100"))
+  
+  # Create figures
+  comparison_present <- comparison_plot(both_df)
+  ggsave(plot = comparison_present, filename = paste0("graph/comparison_multi/",sps,"_present.png"), width = 20, height = 8)
+  comparison_2050 <- comparison_plot(both_2050_df)
+  ggsave(plot = comparison_2050, filename = paste0("graph/comparison_multi/",sps,"_2050.png"), width = 20, height = 8)
+  comparison_2100 <- comparison_plot(both_2100_df)
+  ggsave(plot = comparison_2100, filename = paste0("graph/comparison_multi/",sps,"_2100.png"), width = 20, height = 8)
+  rm(both_df, both_2050_df, both_2100_df, comparison_present, comparison_2050, comparison_2100); gc()
+}
+
+# Run one
+# system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
+
+ # Run them all
+plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
