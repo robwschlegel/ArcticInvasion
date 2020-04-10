@@ -37,9 +37,6 @@ biomod_var_table <- function(sps){
   # The full model results
   biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
   
-  # Visualise quality of different models
-  # models_scores_graph(biomod_model)
-  
   # Get list of variables used
   biomod_var <- as.data.frame(biomod_model@expl.var.names) %>% 
     `colnames<-`(c("var")) %>%
@@ -63,6 +60,9 @@ biomod_res_table <- function(sps){
   
   # The full model results
   biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
+  
+  model_scores <- models_scores_graph(biomod_model, plot = F)
+  ggsave(filename = paste0("graph/model_scores/",sps,"_scores.png"), plot = model_scores)
   
   # Get the TSS scores, cutoffs for binary presence/absence, and specificity/sensitivity
   biomod_cutoff <- plyr::adply(get_evaluations(biomod_model), c(1,3,4,5)) %>% 
@@ -209,4 +209,4 @@ biomod_multi_visuals <- function(sps){
 # system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
 
  # Run them all
-plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
+# plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)

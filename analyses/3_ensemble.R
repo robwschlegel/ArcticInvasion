@@ -122,7 +122,7 @@ sps_binary <- function(sps){
   proj_present <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_present/",sps,".present.projection.out"))),
                                    load_maxent(paste0("data/maxent/",sps,"_avg_binary.tif")),
                                    res_table, "present")
-  writeRaster(df_to_raster(proj_present), paste0("data/biomod/",sps,"_binary_present.asc"))
+  writeRaster(df_to_raster(proj_present), paste0("data/biomod/",sps,"_binary_present.asc"), overwrite = TRUE)
   rm(proj_present); gc()
   
   # 2050 projections
@@ -130,7 +130,7 @@ sps_binary <- function(sps){
   proj_2050 <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_2050/",sps,".2050.projection.out"))),
                                 load_maxent(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif")),
                                 res_table, "2050")
-  writeRaster(df_to_raster(proj_2050), paste0("data/biomod/",sps,"_binary_2050.asc"))
+  writeRaster(df_to_raster(proj_2050), paste0("data/biomod/",sps,"_binary_2050.asc"), overwrite = TRUE)
   rm(proj_2050); gc()
   
   # 2100 projections
@@ -138,8 +138,11 @@ sps_binary <- function(sps){
   proj_2100 <- proj_binary_mean(get_predictions(loadRData(paste0(sps,"/proj_2100/",sps,".2100.projection.out"))), 
                                 load_maxent(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif")), 
                                 res_table, "2100")
-  writeRaster(df_to_raster(proj_2100), paste0("data/biomod/",sps,"_binary_2100.asc"))
+  writeRaster(df_to_raster(proj_2100), paste0("data/biomod/",sps,"_binary_2100.asc"), overwrite = TRUE)
   rm(proj_2100); gc()
+  
+  # Give the machine a breather
+  Sys.sleep(30)
 }
   
 

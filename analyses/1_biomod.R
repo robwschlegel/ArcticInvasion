@@ -107,6 +107,9 @@ biomod_pipeline <- function(sps_choice){
     PA.nb.absences = 10000)
   # biomod_data <- readRDS(paste0(sps_name,"/",sps_name,".base.Rds"))
   
+  # Save the pre-model data for possible later use
+  saveRDS(biomod_data, file = paste0(sps_name,"/",sps_name,".base.Rds"))
+  
   # Model options
   biomod_option <- BIOMOD_ModelingOptions()
   
@@ -116,7 +119,7 @@ biomod_pipeline <- function(sps_choice){
   # Run the model
   biomod_model <- BIOMOD_Modeling(
     biomod_data,
-    models = c('GLM', 'ANN', 'SRE', 'RF'),
+    models = c('GLM', 'ANN', 'RF', 'GAM'),
     models.options = biomod_option,
     NbRunEval = 5,
     DataSplit = 70,
@@ -137,9 +140,6 @@ biomod_pipeline <- function(sps_choice){
   #   models.eval.meth = 'TSS'
   # )
   # biomod_ensemble <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,"ensemble.models.out"))
-  
-  # Save the pre-model data for possible later use
-  saveRDS(biomod_data, file = paste0(sps_name,"/",sps_name,".base.Rds"))
   
   
   # 5. Present projections --------------------------------------------------
@@ -219,5 +219,5 @@ biomod_pipeline <- function(sps_choice){
 # biomod_pipeline(sps_files[17])
 
 # Run them all
-# plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
 
