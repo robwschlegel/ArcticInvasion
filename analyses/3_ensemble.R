@@ -24,7 +24,7 @@ loadRData <- function(fileName){
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # Choose species
-# sps <- sps_names[14]
+# sps <- sps_names[1]
 
 
 # 2: Functions ------------------------------------------------------------
@@ -61,11 +61,11 @@ raster_to_df_binary <- function(layer_num, proj_x, res_table){
 }
 
 # Function that creates the final mean binary value for a porjection
-proj_binary_mean <- function(proj_biomod, proj_maxent, biomod_cutoff, res_table, proj_name){
+proj_binary_mean <- function(proj_biomod, proj_maxent, res_table, proj_name){
   
   # Extract all of the models as a long data.frame
   df_biomod <- plyr::ldply(1:length(proj_biomod@layers), raster_to_df_binary, 
-                           .parallel = F, res_table)
+                           .parallel = F, proj_biomod, res_table)
   
   # Create rounded mean binary values per model
   # system.time(
@@ -149,10 +149,10 @@ sps_binary <- function(sps){
 # 3: Calculate ensemble models --------------------------------------------
 
 # Run one
-# sps_binary(sps_names[2])
+sps_binary(sps_names[1])
 
 # Run all
   # NB: Uses to much RAM when running more than a few at a time
-registerDoParallel(cores = 2)
-plyr::l_ply(sps_names[c(2,14)], sps_binary, .parallel = TRUE)
+# registerDoParallel(cores = 2)
+# plyr::l_ply(sps_names[c(2,14)], sps_binary, .parallel = TRUE)
 

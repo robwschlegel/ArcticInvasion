@@ -46,10 +46,19 @@ top_var <- read_csv("metadata/top_var.csv") %>%
   dplyr::select(-name) %>% 
   na.omit()
 
+# Function for re-loading .RData files as necessary
+loadRData <- function(fileName){
+  load(fileName)
+  get(ls()[ls() != "fileName"])
+}
+
 # Choose a species
-# sps_choice <- sps_files[3]
-# NB: Focus on zooplankton group first
-# c(2, 4, 18)
+# sps_choice <- sps_files[21]
+# 5 - Bsch: 2050, 2100
+# 9 - Cmae: present, 2050, 2100
+# 13 - Dden:  present, 2050, 2100
+# 17 - Mare:  present, 2050, 2100
+# 21 - Pcam: 2050, 2100
 
 # The full pipeline wrapped into a function
 biomod_pipeline <- function(sps_choice){
@@ -98,37 +107,37 @@ biomod_pipeline <- function(sps_choice){
   # 3: Prep data ------------------------------------------------------------
   
   # Prep data for modelling
-  biomod_data <- BIOMOD_FormatingData(
-    resp.var = rep(1, nrow(sps)),
-    resp.xy = as.matrix(sps[,2:3]),
-    resp.name = sps_name,
-    expl.var = expl, 
-    PA.nb.rep = 1, #5, # It seems like 5 runs is unnecessary if 10,000 points are used
-    PA.nb.absences = 10000)
+  # biomod_data <- BIOMOD_FormatingData(
+  #   resp.var = rep(1, nrow(sps)),
+  #   resp.xy = as.matrix(sps[,2:3]),
+  #   resp.name = sps_name,
+  #   expl.var = expl, 
+  #   PA.nb.rep = 1, #5, # It seems like 5 runs is unnecessary if 10,000 points are used
+  #   PA.nb.absences = 10000)
   # biomod_data <- readRDS(paste0(sps_name,"/",sps_name,".base.Rds"))
   
   # Save the pre-model data for possible later use
-  saveRDS(biomod_data, file = paste0(sps_name,"/",sps_name,".base.Rds"))
+  # saveRDS(biomod_data, file = paste0(sps_name,"/",sps_name,".base.Rds"))
   
   # Model options
-  biomod_option <- BIOMOD_ModelingOptions()
+  # biomod_option <- BIOMOD_ModelingOptions()
   
   
   # 4: Model ----------------------------------------------------------------
   
   # Run the model
-  biomod_model <- BIOMOD_Modeling(
-    biomod_data,
-    models = c('GLM', 'ANN', 'RF', 'GAM'),
-    models.options = biomod_option,
-    NbRunEval = 5,
-    DataSplit = 70,
-    VarImport = 0,
-    models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'FAR', 'SR', 'ACCURACY', 'BIAS', 'POD', 'CSI', 'ETS'),
-    rescal.all.models = TRUE,
-    do.full.models = FALSE,
-    modeling.id = sps_name)
-  # biomod_model <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,".models.out"))
+  # biomod_model <- BIOMOD_Modeling(
+  #   biomod_data,
+  #   models = c('GLM', 'ANN', 'RF', 'GAM'),
+  #   models.options = biomod_option,
+  #   NbRunEval = 5,
+  #   DataSplit = 70,
+  #   VarImport = 0,
+  #   models.eval.meth = c('KAPPA', 'TSS', 'ROC', 'FAR', 'SR', 'ACCURACY', 'BIAS', 'POD', 'CSI', 'ETS'),
+  #   rescal.all.models = TRUE,
+  #   do.full.models = FALSE,
+  #   modeling.id = sps_name)
+  biomod_model <- loadRData(paste0(sps_name,"/",sps_name,".",sps_name,".models.out"))
   
   # Build the ensemble models
     # It looks like the ensembles aren't going to be needed
@@ -216,8 +225,10 @@ biomod_pipeline <- function(sps_choice){
 # 7: Run the pipeline -----------------------------------------------------
 
 # Run one
-# biomod_pipeline(sps_files[17])
+# registerDoParallel(cores = 1)
+# biomod_pipeline(sps_files[23])
 
 # Run them all
-plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
+registerDoParallel(cores = 5)
+plyr::l_ply(sps_files[c(5, 9, 13, 17, 21)], biomod_pipeline, .parallel = TRUE)
 

@@ -26,7 +26,7 @@ loadRData <- function(fileName){
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # Choose species
-# sps <- sps_names[5]
+# sps <- sps_names[1]
 
 
 # 2: Create table of variables used ---------------------------------------
@@ -151,6 +151,9 @@ biomod_visuals <- function(sps){
   }
 }
 
+# Run one
+# biomod_visuals(sps_names[1])
+
 # Run them all
 # plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
 
@@ -206,7 +209,8 @@ biomod_multi_visuals <- function(sps){
 }
 
 # Run one
-# system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
+system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
 
  # Run them all
 # plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
+
