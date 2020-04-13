@@ -64,7 +64,7 @@ biomod_res_table <- function(sps){
   biomod_model <- loadRData(paste0(sps,"/",sps,".",sps,".models.out"))
   
   model_scores <- models_scores_graph(biomod_model, plot = F)
-  ggsave(filename = paste0("graph/model_scores/",sps,"_scores.png"), plot = model_scores)
+  # ggsave(filename = paste0("graph/model_scores/",sps,"_scores.png"), plot = model_scores)
   
   # Get the TSS scores, cutoffs for binary presence/absence, and specificity/sensitivity
   biomod_cutoff <- plyr::adply(get_evaluations(biomod_model), c(1,3,4,5)) %>% 
@@ -80,8 +80,8 @@ biomod_res_table <- function(sps){
 # write_csv(all_res_table, "metadata/all_res_table.csv")
 
 # Create a table that shows the mean results
-# mean_res_table <- all_res_table %>% 
-#   group_by(sps, test, model) %>% 
+# mean_res_table <- all_res_table %>%
+#   group_by(sps, test, model) %>%
 #   summarise_if(is.numeric, mean) %>%
 #   ungroup() %>%
 #   mutate_if(is.numeric, round, 2) %>%

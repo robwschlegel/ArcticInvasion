@@ -23,6 +23,7 @@ library(doParallel); registerDoParallel(cores = 50)
 
 # The species occurrence data
 sps_files <- dir("data/occurrence", full.names = T)
+sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # The environmental file pathways
 var_files <- dir("data/present", full.names = T)
@@ -54,6 +55,7 @@ loadRData <- function(fileName){
 
 # Choose a species
 # sps_choice <- sps_files[21]
+# sps <- sps_names[1]
 
 # The full pipeline wrapped into a function
 biomod_pipeline <- function(sps_choice){
@@ -224,6 +226,43 @@ biomod_pipeline <- function(sps_choice){
 # biomod_pipeline(sps_files[23])
 
 # Run them all
-registerDoParallel(cores = 5)
-plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
+# registerDoParallel(cores = 5)
+# plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
+
+
+# 8: Extract psedo-absence points -----------------------------------------
+
+# There is a need to see where the pseudo-absence points were selected for each species
+
+presence_absence_fig <- function(sps_choice){
+  
+  # Load the presence data
+  sps_presence <- read_csv(sps_choice) %>% 
+    mutate(env_index = as.vector(knnx.index(as.matrix(global_coords[,c("s1", "s2")]),
+                                            as.matrix(.[,2:3]), k = 1))) %>%
+    left_join(global_coords, by = "env_index") %>% 
+    dplyr::select(Sps, s1, s2) %>%
+    dplyr::rename(presence = Sps, lon = s1, lat = s2) %>% 
+    mutate(presence = 1)
+  
+  # Load the absence data
+  sps <- str_remove(sps_choice, pattern = "_near.csv")
+  sps <- str_remove(sps, pattern = "data/occurrence/")
+  biomod_data <- readRDS(paste0(sps,"/",sps,".base.Rds"))
+  sps_absence <- data.frame(presence = 0, biomod_data@coord)
+  
+  # Plot
+  PA_fig <- ggplot(data = sps_absence, aes(x = lon, y = lat)) +
+    borders(fill = "grey20", colour = "black") +
+    geom_point(aes(colour = as.factor(presence)), size = 0.01) +
+    geom_point(data = sps_presence, aes(colour = as.factor(presence)), size = 0.01) +
+    labs(x = NULL, y = NULL, colour = "Presence") +
+    scale_colour_manual(values = c("darkred", "forestgreen")) +
+    coord_quickmap(expand = F) +
+    theme(legend.position = "bottom") 
+  # PA_fig
+  ggsave(plot = PA_fig, filename = paste0("graph/comparison_PA/",sps,"_PA_2100.png"), width = 5, height = 3)
+}
+
+# plyr::l_ply(sps_files, presence_absence_fig, .parallel = TRUE)
 
