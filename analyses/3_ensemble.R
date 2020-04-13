@@ -60,7 +60,7 @@ raster_to_df_binary <- function(layer_num, proj_x, res_table){
     dplyr::select(model, run, x, y, z)
 }
 
-# Function that creates the final mean binary value for a porjection
+# Function that creates the final mean binary value for a projection
 proj_binary_mean <- function(proj_biomod, proj_maxent, res_table, proj_name){
   
   # Extract all of the models as a long data.frame

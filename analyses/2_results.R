@@ -6,6 +6,7 @@
 # 3: Create table of model results
 # 4: Create basic comparisons
 # 5: Create multi-model comparisons
+# 6: Create non-binary comparisons
 
 
 # 1: Setup ----------------------------------------------------------------
@@ -155,7 +156,7 @@ biomod_visuals <- function(sps){
 # biomod_visuals(sps_names[1])
 
 # Run them all
-plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
+# plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
 
 
 # 5: Create multi-model comparisons ---------------------------------------
@@ -212,5 +213,13 @@ biomod_multi_visuals <- function(sps){
 # system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
 
  # Run them all
-# plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
+plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
+
+
+# 6: Create non-binary comparisons ----------------------------------------
+
+# Function that converts a raster layer to a dataframe
+raster_to_df_binary <- function(layer_num, proj_x){
+  proj_sub_df <- as.data.frame(proj_x@layers[[layer_num]], xy = T)
+}
 
