@@ -261,8 +261,8 @@ presence_absence_fig <- function(sps_choice){
     coord_quickmap(expand = F) +
     theme(legend.position = "bottom") 
   # PA_fig
-  ggsave(plot = PA_fig, filename = paste0("graph/comparison_PA/",sps,"_PA_2100.png"), width = 5, height = 3)
+  ggsave(plot = PA_fig, filename = paste0("graph/comparison_PA/",sps,"_PA.png"), width = 5, height = 3)
 }
 
-# plyr::l_ply(sps_files, presence_absence_fig, .parallel = TRUE)
+plyr::l_ply(sps_files, presence_absence_fig, .parallel = TRUE)
 
