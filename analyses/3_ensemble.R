@@ -149,10 +149,10 @@ sps_binary <- function(sps){
 # 3: Calculate ensemble models --------------------------------------------
 
 # Run one
-sps_binary(sps_names[1])
+# sps_binary(sps_names[1])
 
 # Run all
   # NB: Uses to much RAM when running more than a few at a time
-# registerDoParallel(cores = 2)
-# plyr::l_ply(sps_names[c(2,14)], sps_binary, .parallel = TRUE)
+registerDoParallel(cores = 4)
+plyr::l_ply(sps_names, sps_binary, .parallel = TRUE)
 

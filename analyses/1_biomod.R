@@ -54,11 +54,6 @@ loadRData <- function(fileName){
 
 # Choose a species
 # sps_choice <- sps_files[21]
-# 5 - Bsch: 2050, 2100
-# 9 - Cmae: present, 2050, 2100
-# 13 - Dden:  present, 2050, 2100
-# 17 - Mare:  present, 2050, 2100
-# 21 - Pcam: 2050, 2100
 
 # The full pipeline wrapped into a function
 biomod_pipeline <- function(sps_choice){
@@ -230,5 +225,5 @@ biomod_pipeline <- function(sps_choice){
 
 # Run them all
 registerDoParallel(cores = 5)
-plyr::l_ply(sps_files[c(5, 9, 13, 17, 21)], biomod_pipeline, .parallel = TRUE)
+plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
 

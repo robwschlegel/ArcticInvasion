@@ -155,7 +155,7 @@ biomod_visuals <- function(sps){
 # biomod_visuals(sps_names[1])
 
 # Run them all
-# plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
+plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
 
 
 # 5: Create multi-model comparisons ---------------------------------------
@@ -209,7 +209,7 @@ biomod_multi_visuals <- function(sps){
 }
 
 # Run one
-system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
+# system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
 
  # Run them all
 # plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
