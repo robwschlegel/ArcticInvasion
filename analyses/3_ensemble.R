@@ -24,7 +24,7 @@ loadRData <- function(fileName){
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # Choose species
-# sps <- sps_names[1]
+# sps <- sps_names[23]
 
 
 # 2: Functions ------------------------------------------------------------
@@ -47,6 +47,9 @@ raster_to_df_binary <- function(layer_num, proj_x, res_table){
   sub_cutoff <- strsplit(colnames(proj_sub_df[3]), "_")[[1]]
   res_table_sub <- res_table %>% 
     filter(run == sub_cutoff[3], model == sub_cutoff[4])
+  
+  # Stop if specificity is 0
+  if(res_table_sub$Specificity == 0) return()
   
   # Stop run if the model TSS is not >=0.7
   if(res_table_sub$score[1] < 0.7) return()
@@ -153,6 +156,6 @@ sps_binary <- function(sps){
 
 # Run all
   # NB: Uses to much RAM when running more than a few at a time
-registerDoParallel(cores = 4)
-plyr::l_ply(sps_names, sps_binary, .parallel = TRUE)
+registerDoParallel(cores = 2)
+plyr::l_ply(sps_names[c(7,23)], sps_binary, .parallel = TRUE)
 
