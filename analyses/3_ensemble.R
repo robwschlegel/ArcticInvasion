@@ -24,7 +24,7 @@ loadRData <- function(fileName){
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # Choose species
-# sps <- sps_names[23]
+# sps <- sps_names[13]
 
 
 # 2: Functions ------------------------------------------------------------
@@ -156,6 +156,6 @@ sps_binary <- function(sps){
 
 # Run all
   # NB: Uses to much RAM when running more than a few at a time
-registerDoParallel(cores = 2)
-plyr::l_ply(sps_names[c(7,23)], sps_binary, .parallel = TRUE)
+registerDoParallel(cores = 4)
+plyr::l_ply(sps_names, sps_binary, .parallel = TRUE)
 

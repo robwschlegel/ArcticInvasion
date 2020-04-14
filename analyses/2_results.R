@@ -214,7 +214,7 @@ biomod_multi_visuals <- function(sps){
 # system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
 
 # Run them all
-plyr::l_ply(sps_names[c(7,23)], biomod_multi_visuals, .parallel = T)
+plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
 
 
 # 6: Create non-binary comparisons ----------------------------------------
