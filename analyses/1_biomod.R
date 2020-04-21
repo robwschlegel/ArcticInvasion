@@ -96,8 +96,8 @@ biomod_pipeline <- function(sps_choice){
   
   # Set temp folder save locations
   # http://www.r-forge.r-project.org/forum/forum.php?thread_id=30946&forum_id=995&group_id=302
-  dir.create (file.path(sps_name), showWarnings = FALSE)
-  dir.create (file.path(sps_name,"/Temp"), showWarnings = FALSE)
+  dir.create(file.path(sps_name), showWarnings = FALSE)
+  dir.create(file.path(sps_name,"/Temp"), showWarnings = FALSE)
   rasterOptions(tmpdir = paste0(sps_name,"/Temp"))
   
   

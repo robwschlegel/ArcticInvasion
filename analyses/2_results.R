@@ -33,6 +33,9 @@ map_base <- ggplot2::fortify(maps::map(fill = TRUE, col = "grey80", plot = FALSE
 # The species occurrence data
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
+# The species depth masks
+sps_depths <- read_csv("metadata/sps_depth.csv")
+
 # Choose species
 # sps <- sps_names[1]
 
@@ -170,50 +173,79 @@ biomod_visuals <- function(sps){
 # NB: This section relies on data created in 'analyses/3_ensemble.R'
 
 # Function that loads an .Rds file and rounds it to the nearest 0.25 degree resolution
-readRDS_0.25 <- function(file_name, projection){
+readRDS_0.25 <- function(file_name, projection_name){
   df <- readRDS(file_name) %>% 
     na.omit() %>% 
     mutate(x = plyr::round_any(x, 0.25), 
            y = plyr::round_any(y, 0.25),
-           model = paste0(model,"_",projection)) %>% 
-    group_by(model, x, y) %>% 
+           projection = projection_name) %>% 
+    group_by(model, projection, x, y) %>% 
     summarise(z = round(mean(z, na.rm = T))) %>% 
     ungroup()
 }
 
 # Convenience function to process a raster into a long dataframe
-raster_to_long <- function(raster_file, model_name){
+raster_to_long <- function(raster_file, model_name, projection_name){
   res <- as.data.frame(raster(raster_file), xy = TRUE) %>%
     na.omit() %>% 
     `colnames<-`(c("x", "y", "z")) %>% 
     mutate(x = plyr::round_any(x, 0.25), 
            y = plyr::round_any(y, 0.25),
-           model = model_name) %>% 
-    group_by(model, x, y) %>% 
+           model = model_name,
+           projection = projection_name) %>% 
+    group_by(model, projection, x, y) %>% 
     summarise(z = round(mean(z, na.rm = TRUE))) %>% 
     ungroup()
   return(res)
 }
 
+# Convenience function for multi-plotting
+comp_multi_plot <- function(df){
+  comparison_fig <- ggplot(data = df, aes(x = x, y = y)) +
+    geom_polygon(data = map_base, aes(x = lon, y = lat, group = group)) +
+    geom_tile(aes(fill = as.factor(z))) +
+    labs(x = NULL, y = NULL, fill = "Presence") +
+    scale_fill_manual(values = c("grey80", "forestgreen")) +
+    facet_wrap(~model) +
+    coord_quickmap(expand = F) +
+    theme(legend.position = "bottom")
+  return(comparison_fig)
+}
+
+# Load depth for result screening
+depth_long <- raster_to_long("data/present/depthclip.asc", "depth", "present") %>% 
+  dplyr::rename(depth = z)
+
 # Wraper to run visuals for all species
 biomod_multi_visuals <- function(sps){
   
-  # Load raster files as formatted dataframes
-  both_df <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_present.Rds"), "present"),
-                   raster_to_long(paste0("data/maxent/",sps,"_avg_binary.tif"), "maxent_present"))
-  both_2050_df <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2050.Rds"), "2050"),
-                        raster_to_long(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif"), "maxent_2050"))
-  both_2100_df <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2100.Rds"), "2100"),
-                        raster_to_long(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif"), "maxent_2100"))
+  # Find species depth limit
+  sps_depth <- filter(sps_depths, Sps == sps)
   
-  # Create figures
-  comparison_present <- comparison_plot(both_df)
+  # Create present figure
+  df_present <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_present.Rds"), "present"),
+                      raster_to_long(paste0("data/maxent/",sps,"_avg_binary.tif"), "maxent", "present"),
+                      raster_to_long(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "ensemble", "present")) %>% 
+    left_join(depth_long, by = c("lon", "lat")) %>% 
+    mutate(z = ifelse(depth > sps_depth$Depth))
+  df_present$model <- factor(df_present$model, levels = unique(df_present$model))
+  comp_multi_present <- comp_multi_plot(both_df)
   ggsave(plot = comparison_present, filename = paste0("graph/comparison_multi/",sps,"_present.png"), width = 20, height = 8)
+  rm(df_present, comparison_present); gc()
+  
+  # Create 2050 figure
+  df_2050 <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2050.Rds"), "2050"),
+                   raster_to_long(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif"), "maxent_2050"))
   comparison_2050 <- comparison_plot(both_2050_df)
   ggsave(plot = comparison_2050, filename = paste0("graph/comparison_multi/",sps,"_2050.png"), width = 20, height = 8)
+  rm(df_2050, comparison_2050); gc()
+  
+  # Create 2050 figure
+  both_2100_df <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2100.Rds"), "2100"),
+                        raster_to_long(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif"), "maxent_2100"))
   comparison_2100 <- comparison_plot(both_2100_df)
   ggsave(plot = comparison_2100, filename = paste0("graph/comparison_multi/",sps,"_2100.png"), width = 20, height = 8)
-  rm(both_df, both_2050_df, both_2100_df, comparison_present, comparison_2050, comparison_2100); gc()
+  rm(df_2100, comparison_2100); gc()
 }
 
 # Run one
