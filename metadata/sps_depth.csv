@@ -1,7 +1,7 @@
 Species,Sps,Depth
 Amphibalanus eburneus,Aebu,50
 Aurelia limbata,Alim,200
-NA,Atam,9999
+Alexandrium tamarense,Atam,9999
 Acartia (Acanthacartia) tonsa,Aton,50
 Botryllus schlosseri,Bsch,200
 Botrylloides violaceus,Bvio,50
@@ -9,11 +9,11 @@ Codium fragile spp. fragile,Cfra,50
 Ciona intestinalis,Cint,500
 Carcinus maenas,Cmae,50
 Chionoecetes opilio,Copi,1500
-NA,Dcau,9999
+Dinophysis caudata,Dcau,9999
 Dumontia contorta,Dcon,50
-NA,Dden,9999
-NA,Gpol,9999
-NA,Htri,9999
+Dinophysis dens,Dden,9999
+Gonyaulax polygramma,Gpol,9999
+Heterocapsa triquetra,Htri,9999
 Littorina littorea,Llit,50
 Mya arenaria,Mare,100
 Mnemiopsis leidyi,Mlei,100
