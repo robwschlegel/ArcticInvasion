@@ -24,6 +24,12 @@ loadRData <- function(fileName){
   get(ls()[ls() != "fileName"])
 }
 
+# The base map
+map_base <- ggplot2::fortify(maps::map(fill = TRUE, col = "grey80", plot = FALSE)) %>%
+  dplyr::rename(lon = long) %>%
+  mutate(group = ifelse(lon > 180, group+9999, group),
+         lon = ifelse(lon > 180, lon-360, lon))
+
 # The species occurrence data
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 

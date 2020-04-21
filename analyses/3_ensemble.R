@@ -1,5 +1,5 @@
 # 3_ensemble.R
-# The purose of this script is to take all of the results from Bbiomod2
+# The purose of this script is to take all of the results from biomod2
 # and MaxEnt and merge them together into one final binary map for each species.
 # 1: Setup the environment
 # 2: Functions
