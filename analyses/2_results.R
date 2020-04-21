@@ -26,7 +26,7 @@ loadRData <- function(fileName){
 }
 
 # The base map
-map_base <- ggplot2::fortify(maps::map(fill = TRUE, col = "grey30", plot = FALSE)) %>%
+map_base <- ggplot2::fortify(maps::map(fill = TRUE, plot = FALSE)) %>%
   dplyr::rename(lon = long) %>%
   mutate(group = ifelse(lon > 180, group+9999, group),
          lon = ifelse(lon > 180, lon-360, lon))
@@ -41,7 +41,7 @@ sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near
 sps_depths <- read_csv("metadata/sps_depth.csv")
 
 # Choose species
-# sps <- sps_names[1]
+# sps <- sps_names[4]
 
 
 # 2: Create table of variables used ---------------------------------------
@@ -203,21 +203,31 @@ raster_to_long <- function(raster_file, model_name, projection_name){
   return(res)
 }
 
+# Load depth for result screening
+depth_long <- raster_to_long("data/present/depthclip.asc", "depth", "present") %>% 
+  dplyr::rename(depth = z) %>% 
+  dplyr::select(x, y, depth)
+
 # Convenience function for multi-plotting
 single_plot <- function(df){
   comp_multi_fig <- ggplot(data = df, aes(x = x, y = y)) +
-    geom_polygon(data = map_base, aes(x = lon, y = lat, group = group)) +
+    geom_polygon(data = map_base, fill = "grey70",
+                 aes(x = lon, y = lat, group = group)) +
     geom_tile(aes(fill = as.factor(z))) +
+    # geom_tile(fill = "red4") +
     labs(x = NULL, y = NULL, 
-         fill = paste0("Predicted habitat suitability: ",df$projection[1])) +
+         fill = "Predicted habitat suitability") +
     scale_fill_manual(values = c("red4")) +
     facet_wrap(~model) +
     coord_quickmap(expand = F) +
-    theme_void() +
+    # theme_void() + # This interferes with ggarrange()
     theme(legend.position = "bottom", 
-          title = element_text(size = 16, face = "italic"),
+          title = element_text(size = 16),
           strip.text = element_text(size = 12),
-          legend.text = element_blank())
+          legend.text = element_blank(), 
+          axis.text = element_blank(),
+          axis.ticks = element_blank(), 
+          panel.grid = element_blank())
   return(comp_multi_fig)
 }
 
@@ -228,6 +238,7 @@ comp_multi_plot <- function(df, sps){
   
   # Load species presence data
   sps_data <- read_csv(sps_files[which(sps == sps_names)]) %>% 
+    `colnames<-`(c("Sps", "lon", "lat")) %>% 
     mutate(lon =  plyr::round_any(lon, 0.25),
            lat =  plyr::round_any(lat, 0.25))
   
@@ -236,20 +247,30 @@ comp_multi_plot <- function(df, sps){
     left_join(depth_long, by = c("x", "y")) %>% 
     mutate(z = ifelse(depth > sps_depth$Depth, 0, z),
            model = factor(model, levels = unique(model))) %>% 
-    filter(z > 0)
+    filter(z != 0)
   
   # Create each panel
-  plot_ANN <- single_plot(filter(df, model == "ANN"), sps_name)
+  plot_ANN <- single_plot(filter(df_sub, model == "ANN")) +
+    geom_point(data = sps_data, aes(x = lon, y = lat), 
+               fill = "white", shape = 21, size = 0.5, stroke = 0.2) #+
+    # labs(title = sps_depth$Species)
+  plot_GAM <- single_plot(filter(df_sub, model == "GAM"))
+  plot_GLM <- single_plot(filter(df_sub, model == "GLM"))
+  plot_RF <- single_plot(filter(df_sub, model == "RF"))
+  plot_MaxEnt <- single_plot(filter(df_sub, model == "MaxEnt"))
+  plot_Ensemble <- single_plot(filter(df_sub, model == "Ensemble")) +
+    theme(panel.background = element_rect(colour = "black", size = 2))
+  
+  # Steek'em
+  plot_multi <- ggarrange(plot_ANN, plot_GAM, plot_GLM, plot_RF, plot_MaxEnt, plot_Ensemble, 
+                          ncol = 3, nrow = 2, common.legend = T, legend = "bottom", align = "hv")
+  plot_multi_title <- annotate_figure(p = plot_multi, fig.lab = df_sub$projection[1], fig.lab.face = "bold", fig.lab.size = 14,
+                                      top = text_grob(sps_depth$Species, color = "black", face = "italic", size = 16))
   
   # Save
-  ggsave(plot = comp_multi_present, width = 21, height = 8,
+  ggsave(plot = plot_multi_title, width = 21, height = 8,
          filename = paste0("graph/comparison_multi/",sps,"_",df$projection[1],".png"))
 }
-
-# Load depth for result screening
-depth_long <- raster_to_long("data/present/depthclip.asc", "depth", "present") %>% 
-  dplyr::rename(depth = z) %>% 
-  dplyr::select(x, y, depth)
 
 # Wraper to run visuals for all species
 biomod_multi_visuals <- function(sps){
@@ -264,23 +285,15 @@ biomod_multi_visuals <- function(sps){
   # Create 2050 figure
   df_2050 <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2050.Rds"), "2050"),
                    raster_to_long(paste0("data/maxent/",sps,"_2050_45_avg_binary.tif"), "MaxEnt", "2050"),
-                   raster_to_long(paste0(sps,"/proj_2050/proj_2050_",sps,"_TSSbin.gri"), "Ensemble", "2050")) %>% 
-    left_join(depth_long, by = c("x", "y")) %>% 
-    mutate(z = ifelse(depth > sps_depth$Depth, 0, z),
-           model = factor(model, levels = unique(model)))
-  comp_multi_2050 <- comp_multi_plot(df_2050, sps_depth$Species)
-  ggsave(plot = comp_multi_2050, filename = paste0("graph/comparison_multi/",sps,"_2050.png"), width = 21, height = 8)
+                   raster_to_long(paste0(sps,"/proj_2050/proj_2050_",sps,"_TSSbin.gri"), "Ensemble", "2050"))
+  comp_multi_2050 <- comp_multi_plot(df_2050, sps)
   rm(df_2050, comp_multi_2050); gc()
   
   # Create 2100 figure
   df_2100 <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_2100.Rds"), "2100"),
                         raster_to_long(paste0("data/maxent/",sps,"_2100_45_avg_binary.tif"), "MaxEnt", "2100"),
-                        raster_to_long(paste0(sps,"/proj_2100/proj_2100_",sps,"_TSSbin.gri"), "Ensemble", "2100")) %>% 
-    left_join(depth_long, by = c("x", "y")) %>% 
-    mutate(z = ifelse(depth > sps_depth$Depth, 0, z),
-           model = factor(model, levels = unique(model)))
-  comp_multi_2100 <- comp_multi_plot(df_2100, sps_depth$Species)
-  ggsave(plot = comp_multi_2100, filename = paste0("graph/comparison_multi/",sps,"_2100.png"), width = 21, height = 8)
+                        raster_to_long(paste0(sps,"/proj_2100/proj_2100_",sps,"_TSSbin.gri"), "Ensemble", "2100"))
+  comp_multi_2100 <- comp_multi_plot(df_2100, sps)
   rm(df_2100, comp_multi_2100); gc()
 }
 
