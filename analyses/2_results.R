@@ -13,6 +13,7 @@
 
 .libPaths(c("~/R-packages", .libPaths()))
 library(tidyverse)
+library(ggpubr)
 library(biomod2)
 library(sp)
 library(dtplyr)
@@ -25,15 +26,18 @@ loadRData <- function(fileName){
 }
 
 # The base map
-map_base <- ggplot2::fortify(maps::map(fill = TRUE, col = "grey80", plot = FALSE)) %>%
+map_base <- ggplot2::fortify(maps::map(fill = TRUE, col = "grey30", plot = FALSE)) %>%
   dplyr::rename(lon = long) %>%
   mutate(group = ifelse(lon > 180, group+9999, group),
          lon = ifelse(lon > 180, lon-360, lon))
 
 # The species occurrence data
+sps_files <- dir("data/occurrence", full.names = T)
+
+# The species abbreviations
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
-# The species depth masks
+# The species depth masks and full names
 sps_depths <- read_csv("metadata/sps_depth.csv")
 
 # Choose species
@@ -200,20 +204,46 @@ raster_to_long <- function(raster_file, model_name, projection_name){
 }
 
 # Convenience function for multi-plotting
-comp_multi_plot <- function(df, sps_name){
+single_plot <- function(df){
   comp_multi_fig <- ggplot(data = df, aes(x = x, y = y)) +
     geom_polygon(data = map_base, aes(x = lon, y = lat, group = group)) +
     geom_tile(aes(fill = as.factor(z))) +
-    labs(x = NULL, y = NULL, fill = "Presence",
-         title = paste0(sps_name,": ",df$projection[1])) +
-    scale_fill_manual(values = c("grey80", "forestgreen")) +
+    labs(x = NULL, y = NULL, 
+         fill = paste0("Predicted habitat suitability: ",df$projection[1])) +
+    scale_fill_manual(values = c("red4")) +
     facet_wrap(~model) +
     coord_quickmap(expand = F) +
     theme_void() +
     theme(legend.position = "bottom", 
-          title = element_text(size = 16),
-          strip.text = element_text(size = 12))
+          title = element_text(size = 16, face = "italic"),
+          strip.text = element_text(size = 12),
+          legend.text = element_blank())
   return(comp_multi_fig)
+}
+
+comp_multi_plot <- function(df, sps){
+  
+  # Find species depth limit
+  sps_depth <- filter(sps_depths, Sps == sps)
+  
+  # Load species presence data
+  sps_data <- read_csv(sps_files[which(sps == sps_names)]) %>% 
+    mutate(lon =  plyr::round_any(lon, 0.25),
+           lat =  plyr::round_any(lat, 0.25))
+  
+  # Prep data for plotting
+  df_sub <- df %>% 
+    left_join(depth_long, by = c("x", "y")) %>% 
+    mutate(z = ifelse(depth > sps_depth$Depth, 0, z),
+           model = factor(model, levels = unique(model))) %>% 
+    filter(z > 0)
+  
+  # Create each panel
+  plot_ANN <- single_plot(filter(df, model == "ANN"), sps_name)
+  
+  # Save
+  ggsave(plot = comp_multi_present, width = 21, height = 8,
+         filename = paste0("graph/comparison_multi/",sps,"_",df$projection[1],".png"))
 }
 
 # Load depth for result screening
@@ -224,18 +254,11 @@ depth_long <- raster_to_long("data/present/depthclip.asc", "depth", "present") %
 # Wraper to run visuals for all species
 biomod_multi_visuals <- function(sps){
   
-  # Find species depth limit
-  sps_depth <- filter(sps_depths, Sps == sps)
-  
   # Create present figure
   df_present <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_present.Rds"), "present"),
                       raster_to_long(paste0("data/maxent/",sps,"_avg_binary.tif"), "MaxEnt", "present"),
-                      raster_to_long(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "Ensemble", "present")) %>% 
-    left_join(depth_long, by = c("x", "y")) %>% 
-    mutate(z = ifelse(depth > sps_depth$Depth, 0, z),
-           model = factor(model, levels = unique(model)))
-  comp_multi_present <- comp_multi_plot(df_present, sps_depth$Species)
-  ggsave(plot = comp_multi_present, filename = paste0("graph/comparison_multi/",sps,"_present.png"), width = 21, height = 8)
+                      raster_to_long(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "Ensemble", "present"))
+  comp_multi_present <- comp_multi_plot(df_present, sps)
   rm(df_present, comp_multi_present); gc()
   
   # Create 2050 figure
