@@ -252,7 +252,7 @@ comp_multi_plot <- function(df, sps){
   # Create each panel
   plot_ANN <- single_plot(filter(df_sub, model == "ANN")) +
     geom_point(data = sps_data, aes(x = lon, y = lat), 
-               fill = "white", shape = 21, size = 0.5, stroke = 0.2) #+
+               fill = "white", shape = 21, size = 1, stroke = 0.5) #+
     # labs(title = sps_depth$Species)
   plot_GAM <- single_plot(filter(df_sub, model == "GAM"))
   plot_GLM <- single_plot(filter(df_sub, model == "GLM"))
@@ -276,9 +276,9 @@ comp_multi_plot <- function(df, sps){
 biomod_multi_visuals <- function(sps){
   
   # Create present figure
-  df_present <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_present.Rds"), "present"),
-                      raster_to_long(paste0("data/maxent/",sps,"_avg_binary.tif"), "MaxEnt", "present"),
-                      raster_to_long(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "Ensemble", "present"))
+  df_present <- rbind(readRDS_0.25(paste0("data/biomod/",sps,"_df_present.Rds"), "Present"),
+                      raster_to_long(paste0("data/maxent/",sps,"_avg_binary.tif"), "MaxEnt", "Present"),
+                      raster_to_long(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "Ensemble", "Present"))
   comp_multi_present <- comp_multi_plot(df_present, sps)
   rm(df_present, comp_multi_present); gc()
   
