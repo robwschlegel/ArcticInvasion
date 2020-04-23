@@ -7,6 +7,7 @@
 # 4: Create basic comparisons
 # 5: Create multi-model comparisons
 # 6: Create non-binary comparisons
+# 7: Create ensemble only figures
 
 
 # 1: Setup ----------------------------------------------------------------
@@ -41,7 +42,7 @@ sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near
 sps_depths <- read_csv("metadata/sps_depth.csv")
 
 # Choose species
-# sps <- sps_names[4]
+sps <- sps_names[4]
 
 
 # 2: Create table of variables used ---------------------------------------
@@ -301,7 +302,7 @@ biomod_multi_visuals <- function(sps){
 # system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
 
 # Run them all
-plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
+# plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
 
 
 # 6: Create non-binary comparisons ----------------------------------------
@@ -407,4 +408,64 @@ biomod_non_binary_visuals <- function(sps){
 
 # Run it all
 # plyr::l_ply(sps_names, biomod_non_binary_visuals, .parallel = T)
+
+
+# 7: Create ensemble only figures -----------------------------------------
+
+ensemble_plot <- function(df, sps){
+  
+  # Find species depth limit
+  sps_depth <- filter(sps_depths, Sps == sps)
+  
+  # Load species presence data
+  sps_data <- read_csv(sps_files[which(sps == sps_names)]) %>% 
+    `colnames<-`(c("Sps", "lon", "lat")) %>% 
+    mutate(lon =  plyr::round_any(lon, 0.25),
+           lat =  plyr::round_any(lat, 0.25))
+  
+  # Prep data for plotting
+  df_sub <- df %>% 
+    left_join(depth_long, by = c("x", "y")) %>% 
+    mutate(z = ifelse(depth > sps_depth$Depth, 0, z),
+           model = factor(model, levels = unique(model))) %>% 
+    filter(z != 0)
+  
+  # Create ensemble panel
+  plot_Ensemble <- single_plot(filter(df_sub, model == "Ensemble")) +
+    geom_point(data = sps_data, aes(x = lon, y = lat), 
+               fill = "white", shape = 21, size = 0.5, stroke = 0.2) +
+    theme(panel.background = element_rect(colour = "black", size = 2),
+          title = element_text(size = 12))
+  
+  # Steek'em
+  # plot_multi <- ggarrange(plot_ANN, plot_GAM, plot_GLM, plot_RF, plot_MaxEnt, plot_Ensemble, 
+  #                         ncol = 3, nrow = 2, common.legend = T, legend = "bottom", align = "hv")
+  plot_ensemble_title <- annotate_figure(p = plot_Ensemble, fig.lab = df_sub$projection[1], fig.lab.face = "bold", fig.lab.size = 8,
+                                      top = text_grob(sps_depth$Species, color = "black", face = "italic", size = 12))
+  
+  # Save
+  ggsave(plot = plot_ensemble_title, width = 4, height = 3,
+         filename = paste0("graph/ensemble/",sps,"_",df$projection[1],".png"))
+}
+
+ensemble_visuals <- function(sps){
+  
+  # Present ensemble
+  df_present <- raster_to_long(paste0(sps,"/proj_present/proj_present_",sps,"_TSSbin.gri"), "Ensemble", "Present")
+  ensemble_plot(df_present, sps)
+  
+  # 2050 ensemble
+  df_2050 <- rbind(raster_to_long(paste0(sps,"/proj_2050/proj_2050_",sps,"_TSSbin.gri"), "Ensemble", "2050"))
+  ensemble_plot(df_2050, sps)
+  
+  # 2100 ensemble
+  df_2100 <- rbind(raster_to_long(paste0(sps,"/proj_2100/proj_2100_",sps,"_TSSbin.gri"), "Ensemble", "2100"))
+  ensemble_plot(df_2100, sps)
+}
+
+# Run one
+# system.time(ensemble_visuals(sps_names[1])) # 35 seconds
+
+# Run them all
+plyr::l_ply(sps_names, ensemble_visuals, .parallel = T)
 
