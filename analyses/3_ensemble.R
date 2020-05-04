@@ -24,6 +24,7 @@ loadRData <- function(fileName){
 sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near.csv")
 
 # Choose species
+  # For testing
 # sps <- sps_names[13]
 
 
