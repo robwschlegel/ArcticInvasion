@@ -1,6 +1,6 @@
 # 2_results.R
-# The purpose of this script is to take the outputs of 1_biomod.R
-# and process them into a format that may be compared to Jesi's Maxent results
+# The purpose of this script is to take the outputs of 1_biomod.R and
+# process them into a format that may be compared to Jesi's Maxent results.
 # 1: Setup the environment
 # 2: Create table of variables used
 # 3: Create table of model results
@@ -42,7 +42,8 @@ sps_names <- str_remove(dir("data/occurrence", full.names = F), pattern = "_near
 sps_depths <- read_csv("metadata/sps_depth.csv")
 
 # Choose species
-sps <- sps_names[4]
+  # For testing
+# sps <- sps_names[4]
 
 
 # 2: Create table of variables used ---------------------------------------
@@ -63,10 +64,10 @@ biomod_var_table <- function(sps){
 }
 
 # Run it all
-# all_var_table <- plyr::ldply(sps_names, biomod_var_table, .parallel = T)
+all_var_table <- plyr::ldply(sps_names, biomod_var_table, .parallel = T)
 
 # Save
-# write_csv(all_var_table, "metadata/all_var_table.csv")
+write_csv(all_var_table, "metadata/all_var_table.csv")
 
 
 # 3: Create table of model results ----------------------------------------
@@ -90,17 +91,17 @@ biomod_res_table <- function(sps){
 }
 
 # Run it all
-# all_res_table <- plyr::ldply(sps_names, biomod_res_table, .parallel = T)
-# write_csv(all_res_table, "metadata/all_res_table.csv")
+all_res_table <- plyr::ldply(sps_names, biomod_res_table, .parallel = T)
+write_csv(all_res_table, "metadata/all_res_table.csv")
 
 # Create a table that shows the mean results
-# mean_res_table <- all_res_table %>%
-#   group_by(sps, test, model) %>%
-#   summarise_if(is.numeric, mean) %>%
-#   ungroup() %>%
-#   mutate_if(is.numeric, round, 2) %>%
-#   mutate(Cutoff = round(Cutoff))
-# write_csv(mean_res_table, "metadata/mean_res_table.csv")
+mean_res_table <- all_res_table %>%
+  group_by(sps, test, model) %>%
+  summarise_if(is.numeric, mean) %>%
+  ungroup() %>%
+  mutate_if(is.numeric, round, 2) %>%
+  mutate(Cutoff = round(Cutoff))
+write_csv(mean_res_table, "metadata/mean_res_table.csv")
 
 
 # 3: Create basic comparisons ---------------------------------------------
@@ -135,7 +136,6 @@ comparison_plot <- function(df){
 # Wraper to run visuals for all species
 biomod_visuals <- function(sps){
   # Load rasters
-  # NB: Not all species have their MaxEnt data uploaded yet so this needs to be confirmed first
   if(file.exists(paste0("data/maxent/",sps,"_avg_binary.tif"))){
     
     # Load raster files as formatted dataframes
@@ -171,11 +171,14 @@ biomod_visuals <- function(sps){
 # biomod_visuals(sps_names[1])
 
 # Run them all
-# plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
+plyr::l_ply(sps_names, biomod_visuals, .parallel = T)
 
 
 # 5: Create multi-model comparisons ---------------------------------------
-# NB: This section relies on data created in 'analyses/3_ensemble.R'
+# NB: This section relies on data created in 'analyses/3_ensemble.R'.
+# One must first go run that script before returning to the follwoing sections here.
+# This was done because 'analyses/3_ensemble.R' had already been written, but this 
+# script already housed much of the necessary code for the following visuals.
 
 # Function that loads an .Rds file and rounds it to the nearest 0.25 degree resolution
 readRDS_0.25 <- function(file_name, projection_name){
@@ -215,13 +218,11 @@ single_plot <- function(df){
     geom_polygon(data = map_base, fill = "grey70",
                  aes(x = lon, y = lat, group = group)) +
     geom_tile(aes(fill = as.factor(z))) +
-    # geom_tile(fill = "red4") +
     labs(x = NULL, y = NULL, 
          fill = "Predicted habitat suitability") +
     scale_fill_manual(values = c("red4")) +
     facet_wrap(~model) +
     coord_quickmap(expand = F) +
-    # theme_void() + # This interferes with ggarrange()
     theme(legend.position = "bottom", 
           title = element_text(size = 16),
           strip.text = element_text(size = 12),
@@ -302,7 +303,7 @@ biomod_multi_visuals <- function(sps){
 # system.time(biomod_multi_visuals(sps_names[1])) # 223 seconds
 
 # Run them all
-# plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
+plyr::l_ply(sps_names, biomod_multi_visuals, .parallel = T)
 
 
 # 6: Create non-binary comparisons ----------------------------------------
@@ -407,7 +408,7 @@ biomod_non_binary_visuals <- function(sps){
 }
 
 # Run it all
-# plyr::l_ply(sps_names, biomod_non_binary_visuals, .parallel = T)
+plyr::l_ply(sps_names, biomod_non_binary_visuals, .parallel = T)
 
 
 # 7: Create ensemble only figures -----------------------------------------
@@ -437,9 +438,7 @@ ensemble_plot <- function(df, sps){
     theme(panel.background = element_rect(colour = "black", size = 2),
           title = element_text(size = 12))
   
-  # Steek'em
-  # plot_multi <- ggarrange(plot_ANN, plot_GAM, plot_GLM, plot_RF, plot_MaxEnt, plot_Ensemble, 
-  #                         ncol = 3, nrow = 2, common.legend = T, legend = "bottom", align = "hv")
+  # Combine
   plot_ensemble_title <- annotate_figure(p = plot_Ensemble, fig.lab = df_sub$projection[1], fig.lab.face = "bold", fig.lab.size = 8,
                                       top = text_grob(sps_depth$Species, color = "black", face = "italic", size = 12))
   
