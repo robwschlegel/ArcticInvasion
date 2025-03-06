@@ -167,7 +167,7 @@ biomod_pipeline <- function(sps_choice){
   # Clean out some space
   rm(biomod_projection); gc()
   
-  # Flush local tmp drive. Better not to do this if running on mulitple cores
+  # Flush local tmp drive. Better not to do this if running on multiple cores
   # unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
   # dir(tempdir())
   
@@ -230,7 +230,7 @@ biomod_pipeline <- function(sps_choice){
 # plyr::l_ply(sps_files, biomod_pipeline, .parallel = TRUE)
 
 
-# 8: Extract psedo-absence points -----------------------------------------
+# 8: Extract pseudo-absence points ----------------------------------------
 
 # There is a need to see where the pseudo-absence points were selected for each species
 
